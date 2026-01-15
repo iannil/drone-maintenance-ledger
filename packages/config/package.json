@@ -1,0 +1,12 @@
+{
+  "name": "@repo/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./eslint": "./eslint.ts",
+    "./tsconfig/node": "./tsconfig/node.json",
+    "./tsconfig/react": "./tsconfig/react.json",
+    "./tsconfig/library": "./tsconfig/library.json"
+  }
+}
