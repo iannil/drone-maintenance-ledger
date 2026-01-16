@@ -11,15 +11,21 @@ import { ComponentListPage } from "./pages/component-list-page";
 import { ComponentDetailPage } from "./pages/component-detail-page";
 import { ComponentFormPage } from "./pages/component-form-page";
 import { MaintenanceSchedulePage } from "./pages/maintenance-schedule-page";
+import { MaintenanceScheduleFormPage } from "./pages/maintenance-schedule-form-page";
 import { WorkOrderListPage } from "./pages/work-order-list-page";
 import { WorkOrderDetailPage } from "./pages/work-order-detail-page";
+import { WorkOrderFormPage } from "./pages/work-order-form-page";
+import { WorkOrderExecutePage } from "./pages/work-order-execute-page";
+import { WorkOrderReleasePage } from "./pages/work-order-release-page";
 import { FlightLogListPage } from "./pages/flight-log-list-page";
 import { FlightLogDetailPage } from "./pages/flight-log-detail-page";
 import { FlightLogFormPage } from "./pages/flight-log-form-page";
+import { PirepFormPage } from "./pages/pirep-form-page";
 import { ReportsDashboardPage } from "./pages/reports-dashboard-page";
 import { SettingsPage } from "./pages/settings-page";
-import { WorkOrderFormPage } from "./pages/work-order-form-page";
 import { InventoryPage } from "./pages/inventory-page";
+import { InventoryMovementsPage } from "./pages/inventory-movements-page";
+import { ComponentTransfersPage } from "./pages/component-transfers-page";
 
 /**
  * Application router configuration
@@ -90,6 +96,10 @@ export const router = createBrowserRouter([
         element: <MaintenanceSchedulePage />,
       },
       {
+        path: "maintenance/schedules/new",
+        element: <MaintenanceScheduleFormPage />,
+      },
+      {
         path: "maintenance/schedules/:id",
         element: <MaintenanceSchedulePage />,
       },
@@ -110,6 +120,14 @@ export const router = createBrowserRouter([
         path: "work-orders/:id/edit",
         element: <WorkOrderFormPage />,
       },
+      {
+        path: "work-orders/:id/execute",
+        element: <WorkOrderExecutePage />,
+      },
+      {
+        path: "work-orders/:id/release",
+        element: <WorkOrderReleasePage />,
+      },
       // Flight Logs
       {
         path: "flight-logs",
@@ -127,6 +145,11 @@ export const router = createBrowserRouter([
         path: "flight-logs/:id/edit",
         element: <FlightLogFormPage />,
       },
+      // PIREP
+      {
+        path: "pirep/new",
+        element: <PirepFormPage />,
+      },
       // Reports
       {
         path: "reports",
@@ -141,6 +164,15 @@ export const router = createBrowserRouter([
       {
         path: "inventory",
         element: <InventoryPage />,
+      },
+      {
+        path: "inventory/movements",
+        element: <InventoryMovementsPage />,
+      },
+      // Component Transfers
+      {
+        path: "components/:id/transfers",
+        element: <ComponentTransfersPage />,
       },
     ],
   },
