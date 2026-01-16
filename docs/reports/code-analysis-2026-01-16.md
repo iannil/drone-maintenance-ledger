@@ -1,6 +1,6 @@
 # 代码分析报告
 
-**分析时间**: 2026-01-16
+**分析时间**: 2026-01-16 (更新: 2026-01-17)
 **分析范围**: 全项目代码和配置
 
 ---
@@ -47,12 +47,13 @@
 
 ### 5. 潜在的技术债务
 
-| 项目 | 说明 | 优先级 |
+| 项目 | 说明 | 状态 |
 |------|------|--------|
-| Mock 数据 | 前端页面全部使用硬编码 Mock 数据 | 高 - Phase 2 Sprint 2 解决 |
-| 缺失测试 | 无单元测试和集成测试 | 中 - Phase 2 Sprint 5 解决 |
-| 缺失 API 文档 | 无 Swagger/OpenAPI 文档 | 低 |
-| 重复的枚举定义 | `packages/types` 和 `packages/db/src/schema` 中有重复的枚举 | 低 |
+| Mock 数据 | 核心页面已对接真实 API | ✅ 部分完成 |
+| TypeScript 编译错误 | 约 56 个错误导致构建失败 | ⚠️ **待修复** |
+| 缺失测试 | 无单元测试和集成测试 | ⏳ Phase 2 Sprint 5 |
+| 缺失 API 文档 | 无 Swagger/OpenAPI 文档 | 低优先级 |
+| 重复的枚举定义 | `packages/types` 和 `packages/db/src/schema` 中有重复的枚举 | 低优先级 |
 
 ---
 
@@ -63,20 +64,19 @@ drone-maintenance-ledger/
 ├── apps/
 │   ├── api/                  # NestJS 后端 (完整实现)
 │   │   └── src/
-│   │       ├── modules/      # 功能模块 (auth, user, asset, flight, maintenance)
+│   │       ├── modules/      # 功能模块 (auth, user, asset, flight, maintenance, stats)
 │   │       └── common/       # 公共守卫、装饰器、过滤器
 │   └── web/                  # React 前端 (51 个页面)
 │       └── src/
 │           ├── pages/        # 页面组件
 │           ├── components/   # UI 组件 (shadcn/ui)
 │           ├── stores/       # MobX 状态
-│           └── services/     # API 服务
+│           └── services/     # API 服务 (8 个服务文件)
 ├── packages/
 │   ├── db/                   # Drizzle ORM 数据库 Schema
 │   ├── types/                # 共享类型定义
 │   ├── config/               # 共享配置
-│   ├── ui/                   # 共享 UI 组件
-│   └── database/             # (冗余?) SQLite 数据库文件
+│   └── ui/                   # 共享 UI 组件
 ├── database/                 # 迁移文件和数据库
 │   └── migrations/
 └── docs/                     # 项目文档
@@ -86,7 +86,7 @@ drone-maintenance-ledger/
 
 ## 已完成的功能清单
 
-### 后端 API (89 端点)
+### 后端 API (92 端点)
 - ✅ 认证系统 (5 端点)
 - ✅ 用户管理 (5 端点)
 - ✅ 机队管理 (6 端点)
@@ -96,15 +96,25 @@ drone-maintenance-ledger/
 - ✅ 飞行员报告 (9 端点)
 - ✅ 放行记录 (8 端点)
 - ✅ 工单管理 (28 端点)
+- ✅ 统计分析 (3 端点) - **新增**
 
 ### 前端页面 (51 个)
 - ✅ 登录和仪表板
 - ✅ 资产配置 (机队/飞机/零部件)
 - ✅ 飞行记录和 PIREP
 - ✅ 工单管理
-- ✅ 库存和采购
+- ✅ 库存和采购 (页面完成，API 待开发)
 - ✅ 报表和分析
 - ✅ 系统设置
+
+### 前端服务层 (8 个服务)
+- ✅ api.ts - API 基础配置
+- ✅ auth.service.ts - 认证服务
+- ✅ fleet.service.ts - 机队服务
+- ✅ component.service.ts - 零部件服务
+- ✅ flight-log.service.ts - 飞行记录服务
+- ✅ work-order.service.ts - 工单服务
+- ✅ stats.service.ts - 统计服务
 
 ### 数据库 Schema (15 张表)
 - ✅ 核心实体 (user, fleet, aircraft, component, component_installation)
@@ -113,29 +123,23 @@ drone-maintenance-ledger/
 
 ---
 
-## 建议的清理行动
-
-### 已完成 ✅
-1. ~~删除~~ ✅ 已删除 `packages/types/src/api/index.ts` 中未使用的 `User` 导入
-2. ✅ 已统一数据库文件位置到 `database/local.db`
-3. ✅ 已删除冗余的空数据库文件和 `packages/database/` 目录
-
-### 后续迭代
-1. 添加类型共享，避免枚举重复定义
-2. 逐步替换 Mock 数据为 API 调用
-3. 添加测试覆盖
-
----
-
 ## 当前开发状态总结
 
 | 维度 | 状态 | 说明 |
 |------|------|------|
 | 数据库 Schema | ✅ 完成 | 15 张表，支持核心业务 |
-| 后端 API | ✅ 完成 | 89 个端点，可正常启动 |
-| 前端页面 | ✅ 完成 | 51 个页面，使用 Mock 数据 |
-| 前后端对接 | ⏳ 待完成 | Phase 2 Sprint 2 任务 |
+| 后端 API | ✅ 完成 | 92 个端点，可正常启动 |
+| 前端页面 | ✅ 完成 | 51 个页面 |
+| 前后端对接 | ✅ 基本完成 | 核心页面已对接 |
+| TypeScript 构建 | ⚠️ 失败 | 约 56 个编译错误 |
 | 测试 | ❌ 待完成 | Phase 2 Sprint 5 任务 |
 | 文档 | ✅ 完善 | 项目文档已更新 |
 
-**结论**: 项目已完成基础框架搭建，核心功能实现完整。下一步重点是前后端对接和测试覆盖。
+**结论**: 项目核心功能基本完成，但存在 TypeScript 编译错误导致无法构建。详见 [代码问题清单](./code-issues-2026-01-17.md)。
+
+---
+
+## 相关文档
+
+- [代码问题清单](./code-issues-2026-01-17.md) - TypeScript 错误详情
+- [项目状态](../PROJECT_STATUS.md) - 项目总体进展
