@@ -1,8 +1,8 @@
 # DroneMaintenance-Ledger 项目进展报告
 
 **更新时间**: 2026-01-16
-**当前版本**: 0.2.0
-**项目状态**: Phase 1 已完成 - 前端框架+核心 API 已实现
+**当前版本**: 0.2.1
+**项目状态**: Phase 2 进行中 - Sprint 1 已完成，API 可正常启动
 
 ---
 
@@ -234,13 +234,16 @@ DroneMaintenance-Ledger 是一个面向无人机和 eVTOL 飞行器的开源 MRO
 
 ## 下一步工作 (Phase 2)
 
+> **Sprint 1 已完成** (2026-01-16): 数据库迁移、种子数据初始化、API 服务启动验证均已通过。
+> 详见 [Sprint 1 完成报告](/docs/reports/completed/phase-2-sprint-1-infrastructure.md)
+
 ### 优先级 P0（必需）
 
-1. **数据库迁移执行**
-   - 运行 `pnpm --filter @repo/db db:push` 推送 schema
-   - 运行 `pnpm --filter @repo/db db:seed` 初始化测试数据
+1. ~~**数据库迁移执行**~~ ✅ 已完成
+   - ~~运行 `pnpm --filter @repo/db db:push` 推送 schema~~
+   - ~~运行 `pnpm --filter @repo/db db:seed` 初始化测试数据~~
 
-2. **API 与前端对接**
+2. **API 与前端对接** ⏳ 进行中
    - 前端页面替换 Mock 数据为真实 API 调用
    - 完善错误处理和加载状态
 
@@ -277,7 +280,7 @@ DroneMaintenance-Ledger 是一个面向无人机和 eVTOL 飞行器的开源 MRO
 ## 遗留问题
 
 ### 高优先级
-1. **数据库迁移** - 已生成迁移文件，待执行
+1. ~~**数据库迁移**~~ ✅ 已完成 - 已生成迁移文件并执行
 2. **前端 API 集成** - 页面使用 Mock 数据，需对接真实 API
 
 ### 中优先级
@@ -297,7 +300,9 @@ DroneMaintenance-Ledger 是一个面向无人机和 eVTOL 飞行器的开源 MRO
 |------|------|------|
 | 项目进展报告 | `/docs/PROJECT_STATUS.md` | 本文档 |
 | 数据库设置 | `/docs/database-setup.md` | 数据库环境配置指南 |
+| 代码分析报告 | `/docs/reports/code-analysis-2026-01-16.md` | 代码质量和冗余分析 |
 | 完成报告 | `/docs/reports/completed/` | 已完成阶段的详细报告 |
+| Phase 2 计划 | `/docs/progress/phase-2-plan.md` | 当前阶段开发计划 |
 | 文件结构规范 | `/docs/standards/file-structure.md` | 代码组织规范 |
 | 命名规范 | `/docs/standards/naming-conventions.md` | 命名约定 |
 | 用户生命周期 | `/docs/standards/user-lifecycle.md` | 用户角色与业务流程 |
