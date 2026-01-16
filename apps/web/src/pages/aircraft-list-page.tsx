@@ -4,7 +4,7 @@ import {
   Plus,
   Search,
   Filter,
-  Wings,
+  Plane,
   Edit2,
   Trash2,
   MoreHorizontal,
@@ -324,7 +324,7 @@ export function AircraftListPage() {
           {/* Empty State */}
           {filteredAircraft.length === 0 && (
             <div className="text-center py-12">
-              <Wings className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <Plane className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
               <h3 className="text-lg font-semibold mb-2">未找到飞机</h3>
               <p className="text-muted-foreground mb-4">
                 {searchQuery || statusFilter !== "all" || fleetFilter !== "all"

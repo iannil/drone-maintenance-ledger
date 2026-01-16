@@ -2,12 +2,11 @@ import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft,
   Edit2,
-  Wings,
+  Package,
   Clock,
   Activity,
   FileText,
   Wrench,
-  Package,
   History,
   MoreHorizontal,
   User,
@@ -243,7 +242,7 @@ export function AircraftDetailPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <Wings className="w-5 h-5 text-muted-foreground" />
+              <Package className="w-5 h-5 text-muted-foreground" />
               <div>
                 <p className="text-sm font-bold">{components.length}</p>
                 <p className="text-xs text-muted-foreground">装载数量</p>
