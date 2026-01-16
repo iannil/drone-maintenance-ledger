@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -16,6 +16,10 @@ import {
   Download,
   Printer,
   Signature,
+  Loader2,
+  RefreshCw,
+  PlayCircle,
+  PauseCircle,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -37,105 +41,44 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { AircraftStatusBadge } from "../components/common/status-badge";
+import { Skeleton } from "../components/ui/skeleton";
+import {
+  workOrderService,
+  WorkOrder,
+  WorkOrderTask,
+  WorkOrderPart,
+  WORK_ORDER_STATUS_LABELS,
+  WORK_ORDER_STATUS_COLORS,
+  WORK_ORDER_TYPE_LABELS,
+  WORK_ORDER_PRIORITY_LABELS,
+} from "../services/work-order.service";
+import { fullAircraftService, Aircraft } from "../services/fleet.service";
+import { useToast } from "../components/ui/toast";
 
-// 工单状态
-const WORK_ORDER_STATUS = {
-  PENDING: { label: "待处理", color: "bg-slate-100 text-slate-700", icon: Clock },
-  IN_PROGRESS: { label: "进行中", color: "bg-blue-100 text-blue-700", icon: Wrench },
-  INSPECTION_REQUIRED: { label: "待检验", color: "bg-yellow-100 text-yellow-700", icon: AlertCircle },
-  COMPLETED: { label: "已完成", color: "bg-green-100 text-green-700", icon: CheckCircle2 },
-  CANCELLED: { label: "已取消", color: "bg-red-100 text-red-700", icon: XCircle },
+// 工单状态图标映射
+const STATUS_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  DRAFT: Clock,
+  OPEN: Clock,
+  IN_PROGRESS: Wrench,
+  PENDING_PARTS: PauseCircle,
+  PENDING_INSPECTION: AlertCircle,
+  COMPLETED: CheckCircle2,
+  RELEASED: CheckCircle2,
+  CANCELLED: XCircle,
 };
 
-// Mock work order data
-const MOCK_WORK_ORDER: Record<string, any> = {
-  "wo-001": {
-    id: "wo-001",
-    workOrderNumber: "WO-2026-0116",
-    title: "电机定期检查 - B-7011U",
-    description: "每50飞行小时检查电机状态，测试电机转速和温度",
-    type: "SCHEDULED",
-    priority: "HIGH",
-    status: "IN_PROGRESS",
-    aircraftId: "ac-001",
-    aircraftRegistration: "B-7011U",
-    aircraftModel: "DJI M350 RTK",
-    scheduleId: "ms-001",
-    scheduleName: "电机定期检查",
-    assignedTo: "张三",
-    createdBy: "系统",
-    createdAt: "2026-01-15T09:00:00",
-    dueDate: "2026-01-20T18:00:00",
-    startedAt: "2026-01-15T10:30:00",
-    completedAt: null,
-    estimatedHours: 2,
-    actualHours: 1.5,
-    notes: "按计划执行，未发现异常。",
-    tasks: [
-      {
-        id: "task-001",
-        title: "外观检查 - 左前电机",
-        description: "检查电机外观是否有损伤、裂纹或异物",
-        isRii: false,
-        status: "COMPLETED",
-        completedBy: "张三",
-        completedAt: "2026-01-15T11:00:00",
-        photos: ["photo1.jpg"],
-      },
-      {
-        id: "task-002",
-        title: "外观检查 - 右前电机",
-        description: "检查电机外观是否有损伤、裂纹或异物",
-        isRii: false,
-        status: "COMPLETED",
-        completedBy: "张三",
-        completedAt: "2026-01-15T11:15:00",
-        photos: [],
-      },
-      {
-        id: "task-003",
-        title: "转速测试 - 左前电机",
-        description: "测试电机最大转速，检查是否平稳",
-        isRii: true,
-        status: "COMPLETED",
-        completedBy: "张三",
-        completedAt: "2026-01-15T11:45:00",
-        photos: ["photo2.jpg"],
-        inspector: "李四",
-        inspectedAt: "2026-01-15T12:00:00",
-      },
-      {
-        id: "task-004",
-        title: "转速测试 - 右前电机",
-        description: "测试电机最大转速，检查是否平稳",
-        isRii: true,
-        status: "PENDING",
-        completedBy: null,
-        completedAt: null,
-        photos: [],
-      },
-      {
-        id: "task-005",
-        title: "温度检查",
-        description: "检查电机工作温度是否在正常范围内",
-        isRii: false,
-        status: "PENDING",
-        completedBy: null,
-        completedAt: null,
-        photos: [],
-      },
-    ],
-    partsUsed: [
-      { id: "part-001", name: "M3螺丝", quantity: 4, unit: "个" },
-      { id: "part-002", name: "垫片", quantity: 4, unit: "个" },
-    ],
-    attachments: [
-      { id: "att-001", name: "检查表.pdf", type: "pdf", size: "245KB" },
-      { id: "att-002", name: "电机测试数据.xlsx", type: "xlsx", size: "128KB" },
-    ],
-  },
-};
+/**
+ * 格式化时间戳
+ */
+function formatTimestamp(ts: number | null): string {
+  if (!ts) return "-";
+  return new Date(ts).toLocaleString("zh-CN");
+}
+
+function formatDate(ts: number | null): string {
+  if (!ts) return "-";
+  return new Date(ts).toLocaleDateString("zh-CN");
+}
 
 /**
  * 工单详情页
@@ -143,37 +86,165 @@ const MOCK_WORK_ORDER: Record<string, any> = {
 export function WorkOrderDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const toastActions = useToast();
   const [showSignDialog, setShowSignDialog] = useState(false);
   const [signature, setSignature] = useState("");
 
-  const workOrder = id ? MOCK_WORK_ORDER[id] : null;
+  // Data state
+  const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
+  const [aircraft, setAircraft] = useState<Aircraft | null>(null);
+  const [tasks, setTasks] = useState<WorkOrderTask[]>([]);
+  const [parts, setParts] = useState<WorkOrderPart[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  if (!workOrder) {
+  // Fetch work order data
+  useEffect(() => {
+    if (!id) return;
+
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // Fetch work order
+        const wo = await workOrderService.getById(id!);
+        setWorkOrder(wo);
+
+        // Fetch aircraft
+        if (wo.aircraftId) {
+          try {
+            const ac = await fullAircraftService.getById(wo.aircraftId);
+            setAircraft(ac);
+          } catch {
+            // Aircraft may not exist
+          }
+        }
+
+        // Fetch tasks and parts
+        const [tasksData, partsData] = await Promise.all([
+          workOrderService.getTasks(id!),
+          workOrderService.getParts(id!),
+        ]);
+        setTasks(tasksData);
+        setParts(partsData);
+      } catch (err) {
+        console.error("Failed to fetch work order:", err);
+        setError("加载工单详情失败");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [id]);
+
+  // Handle status changes
+  const handleStart = async () => {
+    if (!workOrder) return;
+    setActionLoading(true);
+    try {
+      const updated = await workOrderService.start(workOrder.id);
+      setWorkOrder(updated);
+      toastActions.success("已开始工作");
+    } catch (err) {
+      toastActions.error("操作失败", "无法开始工单");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!workOrder) return;
+    setActionLoading(true);
+    try {
+      const updated = await workOrderService.complete(workOrder.id);
+      setWorkOrder(updated);
+      toastActions.success("工单已完成");
+    } catch (err) {
+      toastActions.error("操作失败", "无法完成工单");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRelease = async () => {
+    if (!workOrder || !signature) return;
+    setActionLoading(true);
+    try {
+      const updated = await workOrderService.release(workOrder.id);
+      setWorkOrder(updated);
+      setShowSignDialog(false);
+      setSignature("");
+      toastActions.success("工单已放行");
+    } catch (err) {
+      toastActions.error("操作失败", "无法放行工单");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleTaskStatusChange = async (taskId: string, status: WorkOrderTask["status"]) => {
+    try {
+      const updated = await workOrderService.updateTaskStatus(taskId, status);
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+      toastActions.success("任务状态已更新");
+    } catch (err) {
+      toastActions.error("操作失败", "无法更新任务状态");
+    }
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10 rounded-md" />
+          <div className="flex-1">
+            <Skeleton className="h-7 w-64 mb-2" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        </div>
+        <div className="grid grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-lg" />
+          ))}
+        </div>
+        <Skeleton className="h-96 rounded-lg" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !workOrder) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <h2 className="text-lg font-semibold mb-2">工单不存在</h2>
-          <Button onClick={() => navigate("/work-orders")}>返回工单列表</Button>
+          <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-lg font-semibold mb-2">{error || "工单不存在"}</h2>
+          <div className="flex gap-2 justify-center">
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              重试
+            </Button>
+            <Button onClick={() => navigate("/work-orders")}>返回工单列表</Button>
+          </div>
         </div>
       </div>
     );
   }
 
-  const StatusIcon = WORK_ORDER_STATUS[workOrder.status].icon;
-  const completedTasks = workOrder.tasks.filter((t: any) => t.status === "COMPLETED").length;
-  const totalTasks = workOrder.tasks.length;
-  const progress = (completedTasks / totalTasks) * 100;
+  const StatusIcon = STATUS_ICONS[workOrder.status] || Clock;
+  const completedTasks = tasks.filter((t) => t.status === "COMPLETED").length;
+  const totalTasks = tasks.length;
+  const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
-  const handleStatusChange = (newStatus: string) => {
-    console.log("Status change:", newStatus);
-    // TODO: Implement status change
-  };
-
-  const handleSign = () => {
-    console.log("Sign work order:", signature);
-    setShowSignDialog(false);
-    // TODO: Implement signing
-  };
+  // Check if due date is past
+  const isPastDue =
+    workOrder.scheduledEnd &&
+    new Date(workOrder.scheduledEnd) < new Date() &&
+    !["COMPLETED", "RELEASED", "CANCELLED"].includes(workOrder.status);
 
   return (
     <div className="space-y-6">
@@ -189,13 +260,13 @@ export function WorkOrderDetailPage() {
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-1">
             <h1 className="text-2xl font-bold text-slate-900">{workOrder.title}</h1>
-            <Badge className={WORK_ORDER_STATUS[workOrder.status].color}>
+            <Badge className={WORK_ORDER_STATUS_COLORS[workOrder.status]}>
               <StatusIcon className="h-3 w-3 mr-1" />
-              {WORK_ORDER_STATUS[workOrder.status].label}
+              {WORK_ORDER_STATUS_LABELS[workOrder.status]}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            {workOrder.workOrderNumber}
+            {workOrder.orderNumber}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -209,15 +280,43 @@ export function WorkOrderDetailPage() {
             <Edit2 className="h-4 w-4 mr-2" />
             编辑
           </Button>
-          {workOrder.status === "INSPECTION_REQUIRED" && (
-            <Button onClick={() => setShowSignDialog(true)}>
-              <Signature className="h-4 w-4 mr-2" />
+          {workOrder.status === "PENDING_INSPECTION" && (
+            <Button onClick={() => setShowSignDialog(true)} disabled={actionLoading}>
+              {actionLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Signature className="h-4 w-4 mr-2" />
+              )}
               签字放行
             </Button>
           )}
-          {workOrder.status === "PENDING" && (
-            <Button onClick={() => handleStatusChange("IN_PROGRESS")}>
-              <Wrench className="h-4 w-4 mr-2" />
+          {workOrder.status === "COMPLETED" && (
+            <Button onClick={() => setShowSignDialog(true)} disabled={actionLoading}>
+              {actionLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Signature className="h-4 w-4 mr-2" />
+              )}
+              签字放行
+            </Button>
+          )}
+          {workOrder.status === "IN_PROGRESS" && (
+            <Button onClick={handleComplete} disabled={actionLoading}>
+              {actionLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+              )}
+              完成工单
+            </Button>
+          )}
+          {(workOrder.status === "OPEN" || workOrder.status === "DRAFT") && (
+            <Button onClick={handleStart} disabled={actionLoading}>
+              {actionLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <PlayCircle className="h-4 w-4 mr-2" />
+              )}
               开始工作
             </Button>
           )}
@@ -233,13 +332,19 @@ export function WorkOrderDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Link
-              to={`/aircraft/${workOrder.aircraftId}`}
-              className="font-medium text-primary hover:underline"
-            >
-              {workOrder.aircraftRegistration}
-            </Link>
-            <p className="text-xs text-muted-foreground">{workOrder.aircraftModel}</p>
+            {aircraft ? (
+              <>
+                <Link
+                  to={`/aircraft/${workOrder.aircraftId}`}
+                  className="font-medium text-primary hover:underline"
+                >
+                  {aircraft.registration}
+                </Link>
+                <p className="text-xs text-muted-foreground">{aircraft.model}</p>
+              </>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -251,21 +356,21 @@ export function WorkOrderDetailPage() {
           <CardContent>
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">{workOrder.assignedTo}</span>
+              <span className="font-medium">{workOrder.assignedTo || "未分配"}</span>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-xs font-medium text-muted-foreground">
-              到期时间
+              计划完成
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className={`font-medium ${new Date(workOrder.dueDate) < new Date() && workOrder.status !== "COMPLETED" ? "text-red-600" : ""}`}>
-                {new Date(workOrder.dueDate).toLocaleDateString("zh-CN")}
+              <span className={`font-medium ${isPastDue ? "text-red-600" : ""}`}>
+                {formatDate(workOrder.scheduledEnd)}
               </span>
             </div>
           </CardContent>
@@ -273,12 +378,12 @@ export function WorkOrderDetailPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-xs font-medium text-muted-foreground">
-              工时
+              飞机工时
             </CardTitle>
           </CardHeader>
           <CardContent>
             <span className="font-medium">
-              {workOrder.actualHours || 0} / {workOrder.estimatedHours} 小时
+              {workOrder.aircraftHours ? `${workOrder.aircraftHours.toFixed(1)} 小时` : "-"}
             </span>
           </CardContent>
         </Card>
@@ -319,78 +424,96 @@ export function WorkOrderDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {workOrder.tasks.map((task: any, index: number) => {
-                  const isCompleted = task.status === "COMPLETED";
-                  const isRii = task.isRii;
+              {tasks.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  暂无工卡任务
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {tasks.map((task, index) => {
+                    const isCompleted = task.status === "COMPLETED";
+                    const isRii = task.isRii;
 
-                  return (
-                    <div
-                      key={task.id}
-                      className={`border rounded-lg p-4 ${isCompleted ? "bg-green-50/50" : ""}`}
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className="flex-shrink-0 mt-1">
-                          <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                            isCompleted
-                              ? "bg-green-500 text-white"
-                              : "bg-slate-200 text-slate-600"
-                          }`}>
-                            {index + 1}
+                    return (
+                      <div
+                        key={task.id}
+                        className={`border rounded-lg p-4 ${isCompleted ? "bg-green-50/50" : ""}`}
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="flex-shrink-0 mt-1">
+                            <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                              isCompleted
+                                ? "bg-green-500 text-white"
+                                : "bg-slate-200 text-slate-600"
+                            }`}>
+                              {task.sequence || index + 1}
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-medium">{task.title}</h4>
-                            {isRii && (
-                              <Badge variant="outline" className="text-xs border-red-500 text-red-700">
-                                必检项 (RII)
-                              </Badge>
-                            )}
-                            <Badge
-                              variant="outline"
-                              className={isCompleted ? "border-green-500 text-green-700" : ""}
-                            >
-                              {isCompleted ? "已完成" : "待处理"}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-2">
-                            {task.description}
-                          </p>
-                          {isCompleted && (
-                            <div className="text-xs text-muted-foreground">
-                              <span>完成人: {task.completedBy}</span>
-                              <span className="mx-2">•</span>
-                              <span>完成时间: {new Date(task.completedAt).toLocaleString("zh-CN")}</span>
-                              {task.inspector && (
-                                <>
-                                  <span className="mx-2">•</span>
-                                  <span>检验员: {task.inspector}</span>
-                                </>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-medium">{task.title}</h4>
+                              {isRii && (
+                                <Badge variant="outline" className="text-xs border-red-500 text-red-700">
+                                  必检项 (RII)
+                                </Badge>
                               )}
+                              <Badge
+                                variant="outline"
+                                className={isCompleted ? "border-green-500 text-green-700" : ""}
+                              >
+                                {isCompleted ? "已完成" : task.status === "IN_PROGRESS" ? "进行中" : "待处理"}
+                              </Badge>
                             </div>
-                          )}
-                          {task.photos && task.photos.length > 0 && (
-                            <div className="mt-2 flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">
-                                已添加 {task.photos.length} 张照片
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" disabled={isCompleted}>
-                            <CheckCircle2 className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
+                            <p className="text-sm text-muted-foreground mb-2">
+                              {task.description || task.instructions}
+                            </p>
+                            {isCompleted && (
+                              <div className="text-xs text-muted-foreground">
+                                <span>完成人: {task.completedBy || "-"}</span>
+                                <span className="mx-2">•</span>
+                                <span>完成时间: {formatTimestamp(task.completedAt)}</span>
+                                {task.riiSignedOffBy && (
+                                  <>
+                                    <span className="mx-2">•</span>
+                                    <span>检验员: {task.riiSignedOffBy}</span>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                            {task.result && (
+                              <div className="mt-2 text-sm">
+                                <span className="text-muted-foreground">结果: </span>
+                                {task.result}
+                              </div>
+                            )}
+                            {task.notes && (
+                              <div className="mt-2 text-sm">
+                                <span className="text-muted-foreground">备注: </span>
+                                {task.notes}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {!isCompleted && workOrder.status === "IN_PROGRESS" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleTaskStatusChange(task.id, "COMPLETED")}
+                                title="标记完成"
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -405,67 +528,87 @@ export function WorkOrderDetailPage() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                   <Label className="text-muted-foreground">工单号</Label>
-                  <p className="font-medium">{workOrder.workOrderNumber}</p>
+                  <p className="font-medium">{workOrder.orderNumber}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">类型</Label>
-                  <p className="font-medium">{workOrder.type === "SCHEDULED" ? "计划性" : "非计划性"}</p>
+                  <p className="font-medium">{WORK_ORDER_TYPE_LABELS[workOrder.type]}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">优先级</Label>
-                  <p className="font-medium">{workOrder.priority === "HIGH" ? "高" : workOrder.priority === "CRITICAL" ? "紧急" : "中"}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">创建人</Label>
-                  <p className="font-medium">{workOrder.createdBy}</p>
+                  <p className="font-medium">{WORK_ORDER_PRIORITY_LABELS[workOrder.priority]}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">创建时间</Label>
-                  <p className="font-medium">{new Date(workOrder.createdAt).toLocaleString("zh-CN")}</p>
+                  <p className="font-medium">{formatTimestamp(workOrder.createdAt)}</p>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">开始时间</Label>
+                  <Label className="text-muted-foreground">计划开始</Label>
+                  <p className="font-medium">{formatTimestamp(workOrder.scheduledStart)}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">计划完成</Label>
+                  <p className="font-medium">{formatTimestamp(workOrder.scheduledEnd)}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">实际开始</Label>
+                  <p className="font-medium">{formatTimestamp(workOrder.actualStart)}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">实际完成</Label>
+                  <p className="font-medium">{formatTimestamp(workOrder.actualEnd)}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">飞机工时</Label>
                   <p className="font-medium">
-                    {workOrder.startedAt ? new Date(workOrder.startedAt).toLocaleString("zh-CN") : "-"}
+                    {workOrder.aircraftHours ? `${workOrder.aircraftHours.toFixed(1)} 小时` : "-"}
                   </p>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">完成时间</Label>
+                  <Label className="text-muted-foreground">飞机循环</Label>
                   <p className="font-medium">
-                    {workOrder.completedAt ? new Date(workOrder.completedAt).toLocaleString("zh-CN") : "-"}
+                    {workOrder.aircraftCycles ? `${workOrder.aircraftCycles} 次` : "-"}
                   </p>
                 </div>
-                <div>
-                  <Label className="text-muted-foreground">预计工时</Label>
-                  <p className="font-medium">{workOrder.estimatedHours} 小时</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">实际工时</Label>
-                  <p className="font-medium">{workOrder.actualHours || 0} 小时</p>
-                </div>
+                {workOrder.completedBy && (
+                  <div>
+                    <Label className="text-muted-foreground">完成人</Label>
+                    <p className="font-medium">{workOrder.completedBy}</p>
+                  </div>
+                )}
+                {workOrder.releasedBy && (
+                  <div>
+                    <Label className="text-muted-foreground">放行人</Label>
+                    <p className="font-medium">{workOrder.releasedBy}</p>
+                  </div>
+                )}
               </div>
 
-              {workOrder.scheduleId && (
+              {workOrder.description && (
                 <div>
-                  <Label className="text-muted-foreground">关联维保计划</Label>
-                  <Link
-                    to={`/maintenance/schedules/${workOrder.scheduleId}`}
-                    className="block font-medium text-primary hover:underline"
-                  >
-                    {workOrder.scheduleName}
-                  </Link>
+                  <Label className="text-muted-foreground">描述</Label>
+                  <p className="text-sm">{workOrder.description}</p>
                 </div>
               )}
 
-              <div>
-                <Label className="text-muted-foreground">描述</Label>
-                <p className="text-sm">{workOrder.description}</p>
-              </div>
-
-              {workOrder.notes && (
+              {workOrder.reason && (
                 <div>
-                  <Label className="text-muted-foreground">备注</Label>
-                  <p className="text-sm">{workOrder.notes}</p>
+                  <Label className="text-muted-foreground">原因</Label>
+                  <p className="text-sm">{workOrder.reason}</p>
+                </div>
+              )}
+
+              {workOrder.completionNotes && (
+                <div>
+                  <Label className="text-muted-foreground">完成备注</Label>
+                  <p className="text-sm">{workOrder.completionNotes}</p>
+                </div>
+              )}
+
+              {workOrder.discrepancies && (
+                <div>
+                  <Label className="text-muted-foreground">缺陷</Label>
+                  <p className="text-sm text-amber-700">{workOrder.discrepancies}</p>
                 </div>
               )}
             </CardContent>
@@ -485,22 +628,26 @@ export function WorkOrderDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {workOrder.partsUsed.length > 0 ? (
+              {parts.length > 0 ? (
                 <table className="w-full">
                   <thead>
                     <tr className="border-b">
+                      <th className="text-left py-2 px-4 font-medium text-sm">件号</th>
                       <th className="text-left py-2 px-4 font-medium text-sm">配件名称</th>
                       <th className="text-left py-2 px-4 font-medium text-sm">数量</th>
                       <th className="text-left py-2 px-4 font-medium text-sm">单位</th>
+                      <th className="text-left py-2 px-4 font-medium text-sm">安装位置</th>
                       <th className="text-right py-2 px-4 font-medium text-sm">操作</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {workOrder.partsUsed.map((part: any) => (
+                    {parts.map((part) => (
                       <tr key={part.id} className="border-b">
-                        <td className="py-3 px-4">{part.name}</td>
+                        <td className="py-3 px-4 font-mono text-sm">{part.partNumber}</td>
+                        <td className="py-3 px-4">{part.partName}</td>
                         <td className="py-3 px-4">{part.quantity}</td>
                         <td className="py-3 px-4">{part.unit}</td>
+                        <td className="py-3 px-4">{part.installedLocation || "-"}</td>
                         <td className="py-3 px-4 text-right">
                           <Button variant="ghost" size="icon">
                             <MoreHorizontal className="h-4 w-4" />
@@ -532,24 +679,8 @@ export function WorkOrderDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {workOrder.attachments.map((att: any) => (
-                  <div
-                    key={att.id}
-                    className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50"
-                  >
-                    <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center">
-                      <FileText className="h-5 w-5 text-slate-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{att.name}</p>
-                      <p className="text-xs text-muted-foreground">{att.size}</p>
-                    </div>
-                    <Button variant="ghost" size="icon">
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+              <div className="text-center py-8 text-muted-foreground">
+                暂无附件
               </div>
             </CardContent>
           </Card>
@@ -563,37 +694,95 @@ export function WorkOrderDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex gap-4">
-                  <div className="flex flex-col items-center">
-                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                      <Wrench className="h-4 w-4 text-blue-600" />
+                {workOrder.releasedAt && (
+                  <div className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                      <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div className="w-0.5 flex-1 bg-slate-200 mt-2" />
                     </div>
-                    <div className="w-0.5 flex-1 bg-slate-200 mt-2" />
+                    <div className="flex-1 pb-6">
+                      <p className="font-medium">工单放行</p>
+                      <p className="text-sm text-muted-foreground">
+                        {workOrder.releasedBy || "检验员"} 放行了工单
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatTimestamp(workOrder.releasedAt)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 pb-6">
-                    <p className="font-medium">开始工作</p>
-                    <p className="text-sm text-muted-foreground">
-                      张三 开始执行工单
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      2026-01-15 10:30
-                    </p>
+                )}
+                {workOrder.completedAt && (
+                  <div className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                      <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div className="w-0.5 flex-1 bg-slate-200 mt-2" />
+                    </div>
+                    <div className="flex-1 pb-6">
+                      <p className="font-medium">工单完成</p>
+                      <p className="text-sm text-muted-foreground">
+                        {workOrder.completedBy || "维修人员"} 完成了工单
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatTimestamp(workOrder.completedAt)}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
+                {workOrder.actualStart && (
+                  <div className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                      <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                        <Wrench className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div className="w-0.5 flex-1 bg-slate-200 mt-2" />
+                    </div>
+                    <div className="flex-1 pb-6">
+                      <p className="font-medium">开始工作</p>
+                      <p className="text-sm text-muted-foreground">
+                        {workOrder.assignedTo || "维修人员"} 开始执行工单
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatTimestamp(workOrder.actualStart)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {workOrder.assignedAt && (
+                  <div className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                      <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center">
+                        <User className="h-4 w-4 text-slate-600" />
+                      </div>
+                      <div className="w-0.5 flex-1 bg-slate-200 mt-2" />
+                    </div>
+                    <div className="flex-1 pb-6">
+                      <p className="font-medium">分配工单</p>
+                      <p className="text-sm text-muted-foreground">
+                        工单分配给 {workOrder.assignedTo || "维修人员"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatTimestamp(workOrder.assignedAt)}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <div className="flex gap-4">
                   <div className="flex flex-col items-center">
                     <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center">
                       <Clock className="h-4 w-4 text-slate-600" />
                     </div>
-                    <div className="w-0.5 flex-1 bg-slate-200 mt-2" />
                   </div>
-                  <div className="flex-1 pb-6">
+                  <div className="flex-1">
                     <p className="font-medium">创建工单</p>
                     <p className="text-sm text-muted-foreground">
-                      系统 创建了工单，分配给 张三
+                      工单已创建
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      2026-01-15 09:00
+                      {formatTimestamp(workOrder.createdAt)}
                     </p>
                   </div>
                 </div>
@@ -609,7 +798,7 @@ export function WorkOrderDetailPage() {
           <DialogHeader>
             <DialogTitle>签字放行</DialogTitle>
             <DialogDescription>
-              请确认工单已完成并签字放行。签字后工单将被标记为已完成。
+              请确认工单已完成并签字放行。签字后工单将被标记为已放行。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -638,8 +827,12 @@ export function WorkOrderDetailPage() {
             <Button variant="outline" onClick={() => setShowSignDialog(false)}>
               取消
             </Button>
-            <Button onClick={handleSign} disabled={!signature}>
-              <Signature className="h-4 w-4 mr-2" />
+            <Button onClick={handleRelease} disabled={!signature || actionLoading}>
+              {actionLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Signature className="h-4 w-4 mr-2" />
+              )}
               确认放行
             </Button>
           </DialogFooter>

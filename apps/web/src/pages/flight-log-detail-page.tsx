@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -17,10 +17,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   Plus,
-  X,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import {
   Card,
@@ -30,6 +28,7 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
+import { Skeleton } from "../components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -39,86 +38,14 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { AircraftStatusBadge } from "../components/common/status-badge";
-
-// 飞行类型
-const FLIGHT_TYPES = {
-  INSPECTION: { label: "巡检", color: "bg-blue-50 text-blue-700 border-blue-200" },
-  DELIVERY: { label: "配送", color: "bg-green-50 text-green-700 border-green-200" },
-  SURVEY: { label: "测绘", color: "bg-purple-50 text-purple-700 border-purple-200" },
-  TRAINING: { label: "训练", color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
-  TEST: { label: "测试", color: "bg-slate-50 text-slate-700 border-slate-200" },
-  EMERGENCY: { label: "应急", color: "bg-red-50 text-red-700 border-red-200" },
-};
-
-// 飞行状态
-const FLIGHT_STATUS = {
-  COMPLETED: { label: "已完成", color: "bg-green-100 text-green-700", icon: CheckCircle2 },
-  IN_PROGRESS: { label: "进行中", color: "bg-blue-100 text-blue-700", icon: Plane },
-  ABORTED: { label: "中止", color: "bg-yellow-100 text-yellow-700", icon: AlertTriangle },
-  INCIDENT: { label: "事故", color: "bg-red-100 text-red-700", icon: AlertTriangle },
-};
-
-// Mock flight log data
-const MOCK_FLIGHT_LOG: Record<string, any> = {
-  "fl-001": {
-    id: "fl-001",
-    flightNumber: "FL-20260116-001",
-    date: "2026-01-16",
-    takeoffTime: "08:30",
-    landingTime: "10:15",
-    aircraftId: "ac-001",
-    aircraftRegistration: "B-7011U",
-    aircraftModel: "DJI M350 RTK",
-    pilot: "张三",
-    copilot: "李四",
-    flightType: "INSPECTION",
-    status: "COMPLETED",
-    flightHours: 1.75,
-    flightCycles: 1,
-    takeoffLocation: "基地停机坪",
-    landingLocation: "基地停机坪",
-    route: "基地 -> 巡检区域A -> 巡检区域B -> 基地",
-    waypoints: [
-      { name: "基地", lat: 31.2304, lng: 121.4737, alt: 0, time: "08:30" },
-      { name: "巡检区域A", lat: 31.2400, lng: 121.4900, alt: 100, time: "08:45" },
-      { name: "巡检区域B", lat: 31.2600, lng: 121.5100, alt: 120, time: "09:30" },
-      { name: "基地", lat: 31.2304, lng: 121.4737, alt: 0, time: "10:15" },
-    ],
-    maxAltitude: 120,
-    avgAltitude: 95,
-    distance: 15.2,
-    payload: ["相机", "红外"],
-    fuel: { start: 95, end: 45, unit: "%" },
-    battery: { start: 100, end: 35, unit: "%" },
-    remarks: "正常完成巡检任务，发现1处异常已记录",
-    hasIncident: false,
-    pirepSubmitted: true,
-    pirep: {
-      submittedAt: "2026-01-16T11:00:00",
-      submittedBy: "张三",
-      content: "飞行过程正常，天气晴朗，能见度良好。巡检区域A发现1处绝缘子轻微破损，已拍照记录。设备运行正常，无异常。",
-      findings: [
-        { type: "damage", description: "绝缘子轻微破损", location: "巡检区域A塔杆#23", severity: "minor" },
-      ],
-    },
-    events: [
-      { time: "08:30", type: "takeoff", description: "起飞" },
-      { time: "08:45", type: "waypoint", description: "到达巡检区域A" },
-      { time: "09:15", type: "observation", description: "发现绝缘子破损" },
-      { time: "09:30", type: "waypoint", description: "到达巡检区域B" },
-      { time: "10:15", type: "landing", description: "降落" },
-    ],
-    attachments: [
-      { id: "att-001", name: "飞行轨迹.kml", type: "kml", size: "45KB" },
-      { id: "att-002", name: "巡检照片.zip", type: "zip", size: "128MB" },
-      { id: "att-003", name: "飞行日志.pdf", type: "pdf", size: "256KB" },
-    ],
-    createdAt: "2026-01-16T08:00:00",
-    createdBy: "张三",
-    updatedAt: "2026-01-16T11:30:00",
-  },
-};
+import {
+  flightLogService,
+  FlightLog,
+  FlightType,
+  FLIGHT_TYPE_LABELS,
+  FLIGHT_TYPE_COLORS,
+} from "../services/flight-log.service";
+import { fullAircraftService, Aircraft } from "../services/fleet.service";
 
 /**
  * 飞行日志详情页
@@ -128,27 +55,112 @@ export function FlightLogDetailPage() {
   const navigate = useNavigate();
   const [showPirepDialog, setShowPirepDialog] = useState(false);
   const [pirepContent, setPirepContent] = useState("");
+  const [flightLog, setFlightLog] = useState<FlightLog | null>(null);
+  const [aircraft, setAircraft] = useState<Aircraft | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const flightLog = id ? MOCK_FLIGHT_LOG[id] : null;
+  useEffect(() => {
+    if (id) {
+      loadFlightLog();
+    }
+  }, [id]);
 
-  if (!flightLog) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <h2 className="text-lg font-semibold mb-2">飞行记录不存在</h2>
-          <Button onClick={() => navigate("/flight-logs")}>返回飞行记录列表</Button>
-        </div>
-      </div>
-    );
-  }
+  const loadFlightLog = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const logData = await flightLogService.getById(id!);
+      setFlightLog(logData);
 
-  const StatusIcon = FLIGHT_STATUS[flightLog.status].icon;
+      // Load aircraft info
+      if (logData.aircraftId) {
+        try {
+          const aircraftData = await fullAircraftService.getById(logData.aircraftId);
+          setAircraft(aircraftData);
+        } catch {
+          // Aircraft may not exist, continue without it
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load flight log:", err);
+      setError("加载飞行记录失败");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Format date from timestamp
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleDateString("zh-CN");
+  };
+
+  // Format time from timestamp
+  const formatTime = (timestamp: number | null) => {
+    if (!timestamp) return "-";
+    return new Date(timestamp).toLocaleTimeString("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // Format datetime from timestamp
+  const formatDateTime = (timestamp: number) => {
+    return new Date(timestamp).toLocaleString("zh-CN");
+  };
 
   const handlePirepSubmit = () => {
     console.log("Submit PIREP:", pirepContent);
     setShowPirepDialog(false);
     // TODO: Implement PIREP submission
   };
+
+  // Loading skeleton
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10 rounded" />
+          <div className="flex-1">
+            <Skeleton className="h-8 w-48 mb-2" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="pb-3">
+                <Skeleton className="h-3 w-16" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-5 w-20" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <Card>
+          <CardContent className="pt-6">
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !flightLog) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
+        <h3 className="text-lg font-semibold mb-2">
+          {error || "飞行记录不存在"}
+        </h3>
+        <Button onClick={() => navigate("/flight-logs")}>返回飞行记录列表</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -163,23 +175,28 @@ export function FlightLogDetailPage() {
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold text-slate-900">{flightLog.flightNumber}</h1>
-            <Badge className={FLIGHT_STATUS[flightLog.status].color}>
-              <StatusIcon className="h-3 w-3 mr-1" />
-              {FLIGHT_STATUS[flightLog.status].label}
+            <h1 className="text-2xl font-bold text-slate-900">
+              飞行记录 #{flightLog.id.slice(0, 8)}
+            </h1>
+            <Badge
+              className={
+                FLIGHT_TYPE_COLORS[flightLog.flightType as FlightType] ||
+                "bg-slate-50 text-slate-700"
+              }
+            >
+              {FLIGHT_TYPE_LABELS[flightLog.flightType as FlightType] ||
+                flightLog.flightType}
             </Badge>
-            <Badge className={FLIGHT_TYPES[flightLog.flightType].color}>
-              {FLIGHT_TYPES[flightLog.flightType].label}
-            </Badge>
-            {flightLog.hasIncident && (
+            {flightLog.discrepancies && (
               <Badge variant="destructive" className="gap-1">
                 <AlertTriangle className="h-3 w-3" />
-                有事故
+                有异常
               </Badge>
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            {flightLog.date} · {flightLog.aircraftRegistration}
+            {formatDate(flightLog.flightDate)} ·{" "}
+            {aircraft?.registration || "未知飞机"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -189,16 +206,13 @@ export function FlightLogDetailPage() {
           <Button variant="outline" size="icon" title="导出">
             <Download className="h-4 w-4" />
           </Button>
-          <Button variant="outline" onClick={() => navigate(`/flight-logs/${id}/edit`)}>
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/flight-logs/${id}/edit`)}
+          >
             <Edit2 className="h-4 w-4 mr-2" />
             编辑
           </Button>
-          {!flightLog.pirepSubmitted && (
-            <Button onClick={() => setShowPirepDialog(true)}>
-              <FileText className="h-4 w-4 mr-2" />
-              提交飞行员报告
-            </Button>
-          )}
         </div>
       </div>
 
@@ -211,13 +225,19 @@ export function FlightLogDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Link
-              to={`/aircraft/${flightLog.aircraftId}`}
-              className="font-medium text-primary hover:underline"
-            >
-              {flightLog.aircraftRegistration}
-            </Link>
-            <p className="text-xs text-muted-foreground">{flightLog.aircraftModel}</p>
+            {aircraft ? (
+              <>
+                <Link
+                  to={`/aircraft/${flightLog.aircraftId}`}
+                  className="font-medium text-primary hover:underline"
+                >
+                  {aircraft.registration}
+                </Link>
+                <p className="text-xs text-muted-foreground">{aircraft.model}</p>
+              </>
+            ) : (
+              <span className="text-muted-foreground">未知</span>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -229,10 +249,14 @@ export function FlightLogDetailPage() {
           <CardContent>
             <div className="flex items-center gap-1">
               <User className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">{flightLog.pilot}</span>
+              <span className="font-medium">
+                {flightLog.pilotId?.slice(0, 8) || "未知"}
+              </span>
             </div>
-            {flightLog.copilot && (
-              <p className="text-xs text-muted-foreground">副驾: {flightLog.copilot}</p>
+            {flightLog.copilotId && (
+              <p className="text-xs text-muted-foreground">
+                副驾: {flightLog.copilotId.slice(0, 8)}
+              </p>
             )}
           </CardContent>
         </Card>
@@ -247,57 +271,71 @@ export function FlightLogDetailPage() {
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium">{flightLog.flightHours} 小时</span>
             </div>
-            <p className="text-xs text-muted-foreground">{flightLog.flightCycles} 次循环</p>
+            <p className="text-xs text-muted-foreground">
+              {flightLog.flightDuration} 分钟
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-xs font-medium text-muted-foreground">
-              飞行里程
+              起降循环
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-1">
-              <Route className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">{flightLog.distance} km</span>
+              <Plane className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">{flightLog.takeoffCycles} 次起飞</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {flightLog.landingCycles} 次降落
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-xs font-medium text-muted-foreground">
+              载荷重量
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-1">
+              <Package className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">
+                {flightLog.payloadWeight ? `${flightLog.payloadWeight} kg` : "-"}
+              </span>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-xs font-medium text-muted-foreground">
-              最大高度
+              起飞前检查
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-1">
-              <Mountain className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">{flightLog.maxAltitude} m</span>
-            </div>
-            <p className="text-xs text-muted-foreground">平均: {flightLog.avgAltitude}m</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              剩余电量
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <span className="font-medium">{flightLog.battery.end}%</span>
-            <p className="text-xs text-muted-foreground">起始: {flightLog.battery.start}%</p>
+            {flightLog.preFlightCheckCompleted ? (
+              <div className="flex items-center gap-1 text-green-600">
+                <CheckCircle2 className="h-4 w-4" />
+                <span className="font-medium">已完成</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 text-yellow-600">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="font-medium">未完成</span>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* Main Content */}
       <Tabs defaultValue="overview">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">概览</TabsTrigger>
-          <TabsTrigger value="route">航线轨迹</TabsTrigger>
-          <TabsTrigger value="pirep">飞行员报告</TabsTrigger>
-          <TabsTrigger value="events">事件记录</TabsTrigger>
-          <TabsTrigger value="attachments">附件</TabsTrigger>
+          <TabsTrigger value="route">航线信息</TabsTrigger>
+          <TabsTrigger value="metrics">飞机指标</TabsTrigger>
+          <TabsTrigger value="notes">备注</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -312,65 +350,54 @@ export function FlightLogDetailPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-muted-foreground text-xs">起飞时间</Label>
-                    <p className="font-medium">{flightLog.takeoffTime}</p>
+                    <p className="font-medium">{formatTime(flightLog.departureTime)}</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-xs">降落时间</Label>
-                    <p className="font-medium">{flightLog.landingTime}</p>
+                    <p className="font-medium">{formatTime(flightLog.arrivalTime)}</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-xs">起飞地点</Label>
-                    <p className="font-medium">{flightLog.takeoffLocation}</p>
+                    <p className="font-medium">{flightLog.departureLocation}</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-xs">降落地点</Label>
-                    <p className="font-medium">{flightLog.landingLocation}</p>
+                    <p className="font-medium">{flightLog.arrivalLocation || "-"}</p>
                   </div>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground text-xs">航线</Label>
-                  <p className="text-sm">{flightLog.route}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">任务载荷</Label>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {flightLog.payload.map((item: string, index: number) => (
-                      <Badge key={index} variant="outline">
-                        <Package className="h-3 w-3 mr-1" />
-                        {item}
-                      </Badge>
-                    ))}
-                  </div>
+                  <Label className="text-muted-foreground text-xs">飞行类型</Label>
+                  <Badge
+                    className={`mt-1 ${
+                      FLIGHT_TYPE_COLORS[flightLog.flightType as FlightType] ||
+                      "bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    {FLIGHT_TYPE_LABELS[flightLog.flightType as FlightType] ||
+                      flightLog.flightType}
+                  </Badge>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Battery/Fuel Info */}
+            {/* Mission Info */}
             <Card>
               <CardHeader>
-                <CardTitle>能源消耗</CardTitle>
+                <CardTitle>任务信息</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <Label className="text-xs">电池</Label>
-                    <span className="text-sm text-muted-foreground">
-                      {flightLog.battery.start}% → {flightLog.battery.end}%
-                    </span>
-                  </div>
-                  <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-green-500 rounded-full transition-all"
-                      style={{ width: `${flightLog.battery.end}%` }}
-                    />
-                  </div>
+                  <Label className="text-muted-foreground text-xs">任务描述</Label>
+                  <p className="text-sm mt-1 p-3 bg-slate-50 rounded-lg">
+                    {flightLog.missionDescription || "无任务描述"}
+                  </p>
                 </div>
-                {flightLog.remarks && (
-                  <div>
-                    <Label className="text-xs">备注</Label>
-                    <p className="text-sm text-muted-foreground mt-1">{flightLog.remarks}</p>
-                  </div>
-                )}
+                <div>
+                  <Label className="text-muted-foreground text-xs">载荷重量</Label>
+                  <p className="font-medium">
+                    {flightLog.payloadWeight ? `${flightLog.payloadWeight} kg` : "未记录"}
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -380,10 +407,8 @@ export function FlightLogDetailPage() {
         <TabsContent value="route">
           <Card>
             <CardHeader>
-              <CardTitle>航线轨迹</CardTitle>
-              <CardDescription>
-                航点列表与飞行轨迹
-              </CardDescription>
+              <CardTitle>航线信息</CardTitle>
+              <CardDescription>起降地点和航线详情</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="mb-6 p-4 bg-slate-50 rounded-lg border-2 border-dashed border-slate-200">
@@ -393,173 +418,139 @@ export function FlightLogDetailPage() {
                 </div>
               </div>
 
-              <h3 className="font-semibold mb-4">航点列表</h3>
-              <div className="space-y-2">
-                {flightLog.waypoints.map((wp: any, index: number) => (
-                  <div key={index} className="flex items-center gap-4 p-3 border rounded-lg">
-                    <div className="flex-shrink-0">
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                        index === 0
-                          ? "bg-green-100 text-green-700"
-                          : index === flightLog.waypoints.length - 1
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-slate-100 text-slate-600"
-                      }`}>
-                        {index + 1}
-                      </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 p-3 border rounded-lg">
+                  <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                    <Plane className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium">起飞</p>
+                    <p className="text-sm text-muted-foreground">
+                      {flightLog.departureLocation}
+                    </p>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {formatTime(flightLog.departureTime)}
+                  </div>
+                </div>
+
+                {flightLog.arrivalLocation && (
+                  <div className="flex items-center gap-4 p-3 border rounded-lg">
+                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <Plane className="h-5 w-5 text-blue-600 rotate-45" />
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium">{wp.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        纬度: {wp.lat} · 经度: {wp.lng} · 高度: {wp.alt}m
+                      <p className="font-medium">降落</p>
+                      <p className="text-sm text-muted-foreground">
+                        {flightLog.arrivalLocation}
                       </p>
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {wp.time}
+                      {formatTime(flightLog.arrivalTime)}
                     </div>
                   </div>
-                ))}
+                )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* PIREP Tab */}
-        <TabsContent value="pirep">
+        {/* Metrics Tab */}
+        <TabsContent value="metrics">
           <Card>
             <CardHeader>
-              <CardTitle>飞行员报告 (PIREP)</CardTitle>
-              <CardDescription>
-                {flightLog.pirepSubmitted
-                  ? `提交于 ${new Date(flightLog.pirep.submittedAt).toLocaleString("zh-CN")} by ${flightLog.pirep.submittedBy}`
-                  : "尚未提交"}
-              </CardDescription>
+              <CardTitle>飞机指标变化</CardTitle>
+              <CardDescription>本次飞行前后的飞机累计指标</CardDescription>
             </CardHeader>
             <CardContent>
-              {flightLog.pirepSubmitted ? (
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-xs">报告内容</Label>
-                    <p className="text-sm mt-1 p-3 bg-slate-50 rounded-lg">
-                      {flightLog.pirep.content}
-                    </p>
-                  </div>
-
-                  {flightLog.pirep.findings && flightLog.pirep.findings.length > 0 && (
-                    <div>
-                      <Label className="text-xs">发现记录</Label>
-                      <div className="mt-2 space-y-2">
-                        {flightLog.pirep.findings.map((finding: any, index: number) => (
-                          <div key={index} className="flex items-start gap-3 p-3 border rounded-lg">
-                            <AlertTriangle className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
-                              finding.severity === "minor" ? "text-yellow-500" : "text-red-500"
-                            }`} />
-                            <div className="flex-1">
-                              <p className="font-medium">{finding.description}</p>
-                              <p className="text-xs text-muted-foreground">
-                                位置: {finding.location} · 严重程度: {finding.severity === "minor" ? "轻微" : "严重"}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <h4 className="font-medium mb-4">飞行小时</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">飞行前</span>
+                      <span className="font-medium">
+                        {flightLog.aircraftHoursBefore ?? "-"} h
+                      </span>
                     </div>
-                  )}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">飞行后</span>
+                      <span className="font-medium">
+                        {flightLog.aircraftHoursAfter ?? "-"} h
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm pt-2 border-t">
+                      <span className="text-muted-foreground">本次增加</span>
+                      <span className="font-medium text-green-600">
+                        +{flightLog.flightHours} h
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>飞行员报告尚未提交</p>
-                  <Button
-                    className="mt-4"
-                    onClick={() => setShowPirepDialog(true)}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    创建飞行员报告
-                  </Button>
+
+                <div>
+                  <h4 className="font-medium mb-4">起降循环</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">飞行前</span>
+                      <span className="font-medium">
+                        {flightLog.aircraftCyclesBefore ?? "-"} 次
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">飞行后</span>
+                      <span className="font-medium">
+                        {flightLog.aircraftCyclesAfter ?? "-"} 次
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm pt-2 border-t">
+                      <span className="text-muted-foreground">本次增加</span>
+                      <span className="font-medium text-green-600">
+                        +{flightLog.takeoffCycles} 次
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Notes Tab */}
+        <TabsContent value="notes">
+          <Card>
+            <CardHeader>
+              <CardTitle>备注与异常</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-muted-foreground text-xs">飞行后备注</Label>
+                <p className="text-sm mt-1 p-3 bg-slate-50 rounded-lg">
+                  {flightLog.postFlightNotes || "无备注"}
+                </p>
+              </div>
+
+              {flightLog.discrepancies && (
+                <div>
+                  <Label className="text-muted-foreground text-xs flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                    发现的异常
+                  </Label>
+                  <p className="text-sm mt-1 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    {flightLog.discrepancies}
+                  </p>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        {/* Events Tab */}
-        <TabsContent value="events">
-          <Card>
-            <CardHeader>
-              <CardTitle>事件记录</CardTitle>
-              <CardDescription>
-                飞行过程中的关键事件
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {flightLog.events.map((event: any, index: number) => (
-                  <div key={index} className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                        event.type === "takeoff" || event.type === "landing"
-                          ? "bg-blue-100"
-                          : event.type === "observation"
-                          ? "bg-yellow-100"
-                          : "bg-slate-100"
-                      }`}>
-                        {event.type === "takeoff" && <Plane className="h-4 w-4 text-blue-600" />}
-                        {event.type === "landing" && <Plane className="h-4 w-4 text-blue-600 rotate-45" />}
-                        {event.type === "waypoint" && <MapPin className="h-4 w-4 text-slate-600" />}
-                        {event.type === "observation" && <AlertTriangle className="h-4 w-4 text-yellow-600" />}
-                      </div>
-                      {index < flightLog.events.length - 1 && (
-                        <div className="w-0.5 flex-1 bg-slate-200 my-1" />
-                      )}
-                    </div>
-                    <div className="flex-1 pb-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium">{event.description}</p>
-                        <span className="text-xs text-muted-foreground">{event.time}</span>
-                      </div>
-                      {event.type === "observation" && (
-                        <Badge variant="outline" className="text-xs">观察记录</Badge>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Attachments Tab */}
-        <TabsContent value="attachments">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>附件</CardTitle>
-                <Button size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  上传附件
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {flightLog.attachments.map((att: any) => (
-                  <div
-                    key={att.id}
-                    className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50"
-                  >
-                    <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center">
-                      <FileText className="h-5 w-5 text-slate-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{att.name}</p>
-                      <p className="text-xs text-muted-foreground">{att.size}</p>
-                    </div>
-                    <Button variant="ghost" size="icon">
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+              <div className="pt-4 border-t">
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>创建时间</span>
+                  <span>{formatDateTime(flightLog.createdAt)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm text-muted-foreground mt-2">
+                  <span>更新时间</span>
+                  <span>{formatDateTime(flightLog.updatedAt)}</span>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -571,9 +562,7 @@ export function FlightLogDetailPage() {
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>提交飞行员报告 (PIREP)</DialogTitle>
-            <DialogDescription>
-              请详细记录飞行过程中的观察和发现
-            </DialogDescription>
+            <DialogDescription>请详细记录飞行过程中的观察和发现</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>

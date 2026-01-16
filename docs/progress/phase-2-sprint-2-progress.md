@@ -1,13 +1,13 @@
-# Sprint 2 进度报告：前后端对接 (第一批)
+# Sprint 2 进度报告：前后端对接 (第一批 + 第二批)
 
-**时间**: 2026-01-16
+**时间**: 2026-01-16 - 2026-01-17
 **执行人**: Claude Code
 
 ---
 
 ## 执行摘要
 
-完成了 Sprint 2 第一批前后端对接任务，包括 API 客户端完善、登录页对接、仪表板统计 API 开发及对接、机队管理页面对接、飞机管理页面对接。
+完成了 Sprint 2 全部前后端对接任务，包括 API 客户端完善、登录页对接、仪表板统计 API 开发及对接、机队管理页面对接、飞机管理页面对接、零部件管理页面对接、飞行记录页面对接、工单管理页面对接。
 
 ---
 
@@ -102,6 +102,49 @@
 - 删除确认对话框
 - 加载状态骨架屏
 
+### 2.7 飞行记录页面对接 ✅ (2026-01-17)
+
+**新增前端服务**: `apps/web/src/services/flight-log.service.ts`
+
+| 文件 | 变更 |
+|------|------|
+| `apps/web/src/pages/flight-log-list-page.tsx` | 使用 flightLogService 加载真实数据 |
+| `apps/web/src/pages/flight-log-detail-page.tsx` | 使用 flightLogService 加载真实数据 |
+
+功能：
+- 飞行记录列表从 API 加载
+- 飞行记录详情页从 API 加载
+- 按飞行类型筛选（运营、训练、测试、转场、配送）
+- 按飞机筛选
+- 显示飞行路线（起降地点、时间）
+- 显示飞行指标（时长、起降次数）
+- 显示飞行前后的飞机工时/循环数
+- 加载状态骨架屏
+
+### 2.8 工单管理页面对接 ✅ (2026-01-17)
+
+**新增前端服务**: `apps/web/src/services/work-order.service.ts`
+
+| 文件 | 变更 |
+|------|------|
+| `apps/web/src/pages/work-order-list-page.tsx` | 使用 workOrderService 加载真实数据 |
+| `apps/web/src/pages/work-order-detail-page.tsx` | 使用 workOrderService 加载真实数据 |
+
+功能：
+- 工单列表从 API 加载
+- 支持列表视图和看板视图
+- 工单详情页从 API 加载
+- 工卡任务列表和进度条
+- 领用配件列表
+- 操作历史时间线
+- 工单状态操作（开始、完成、放行）
+- 任务状态更新
+- 签字放行对话框
+- 按状态筛选（草稿、待处理、进行中等）
+- 按类型筛选（计划性、检查、维修、改装、紧急）
+- 优先级显示（低、中、高、紧急）
+- 加载状态骨架屏
+
 ---
 
 ## 新增文件
@@ -114,6 +157,8 @@
 | `apps/web/src/services/stats.service.ts` | 前端统计服务 |
 | `apps/web/src/services/fleet.service.ts` | 前端机队服务 |
 | `apps/web/src/services/component.service.ts` | 前端零部件服务 |
+| `apps/web/src/services/flight-log.service.ts` | 前端飞行记录服务 |
+| `apps/web/src/services/work-order.service.ts` | 前端工单服务 |
 | `apps/web/src/components/ui/toast.tsx` | Toast 通知组件 |
 | `apps/web/src/components/ui/alert-dialog.tsx` | 确认对话框组件 |
 
@@ -133,6 +178,10 @@
 | `apps/web/src/pages/aircraft-detail-page.tsx` | API 对接 |
 | `apps/web/src/pages/component-list-page.tsx` | API 对接 |
 | `apps/web/src/pages/component-detail-page.tsx` | API 对接 |
+| `apps/web/src/pages/flight-log-list-page.tsx` | API 对接 |
+| `apps/web/src/pages/flight-log-detail-page.tsx` | API 对接 |
+| `apps/web/src/pages/work-order-list-page.tsx` | API 对接 |
+| `apps/web/src/pages/work-order-detail-page.tsx` | API 对接 |
 
 ---
 
@@ -175,19 +224,20 @@
 ## 下一步工作
 
 1. ~~**零部件管理页面对接**~~ - ✅ 已完成
-2. **飞行记录页面对接** - 待完成
-3. **工单管理页面对接** - 待完成
-4. **修复预存在的 TypeScript 错误**
+2. ~~**飞行记录页面对接**~~ - ✅ 已完成
+3. ~~**工单管理页面对接**~~ - ✅ 已完成
+4. **修复预存在的 TypeScript 错误** - 待处理
+5. **表单页面对接（创建/编辑）** - 下一阶段
 
 ---
 
 ## 构建验证
 
 ```bash
-# Vite 构建成功
+# Vite 构建成功 (2026-01-17)
 npx vite build
-✓ 1781 modules transformed.
-✓ built in 3.38s
+✓ 1784 modules transformed.
+✓ built in 2.78s
 ```
 
 ---
@@ -209,3 +259,13 @@ npx vite build
 | GET /api/components | ✅ 已对接 |
 | GET /api/components/:id | ✅ 已对接 |
 | DELETE /api/components/:id | ✅ 已对接 |
+| GET /api/flight-logs | ✅ 已对接 |
+| GET /api/flight-logs/:id | ✅ 已对接 |
+| GET /api/work-orders | ✅ 已对接 |
+| GET /api/work-orders/:id | ✅ 已对接 |
+| GET /api/work-orders/:id/tasks | ✅ 已对接 |
+| GET /api/work-orders/:id/parts | ✅ 已对接 |
+| POST /api/work-orders/:id/start | ✅ 已对接 |
+| POST /api/work-orders/:id/complete | ✅ 已对接 |
+| POST /api/work-orders/:id/release | ✅ 已对接 |
+| PUT /api/work-orders/tasks/:id/status | ✅ 已对接 |

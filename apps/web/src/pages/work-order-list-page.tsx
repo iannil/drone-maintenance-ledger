@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Plus,
@@ -12,6 +12,7 @@ import {
   Wrench,
   Calendar,
   MoreHorizontal,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -23,49 +24,32 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
+import { Skeleton } from "../components/ui/skeleton";
+import {
+  workOrderService,
+  WorkOrder,
+  WorkOrderType,
+  WorkOrderStatus,
+  WorkOrderPriority,
+  WORK_ORDER_TYPE_LABELS,
+  WORK_ORDER_TYPE_COLORS,
+  WORK_ORDER_STATUS_LABELS,
+  WORK_ORDER_STATUS_COLORS,
+  WORK_ORDER_PRIORITY_LABELS,
+  WORK_ORDER_PRIORITY_COLORS,
+} from "../services/work-order.service";
+import { fullAircraftService, Aircraft } from "../services/fleet.service";
 
-// 工单状态
-const WORK_ORDER_STATUS = {
-  PENDING: {
-    label: "待处理",
-    color: "bg-slate-100 text-slate-700",
-    icon: Clock,
-  },
-  IN_PROGRESS: {
-    label: "进行中",
-    color: "bg-blue-100 text-blue-700",
-    icon: Wrench,
-  },
-  INSPECTION_REQUIRED: {
-    label: "待检验",
-    color: "bg-yellow-100 text-yellow-700",
-    icon: AlertCircle,
-  },
-  COMPLETED: {
-    label: "已完成",
-    color: "bg-green-100 text-green-700",
-    icon: CheckCircle2,
-  },
-  CANCELLED: {
-    label: "已取消",
-    color: "bg-red-100 text-red-700",
-    icon: XCircle,
-  },
-};
-
-// 工单类型
-const WORK_ORDER_TYPES = {
-  SCHEDULED: { label: "计划性", color: "bg-purple-50 text-purple-700 border-purple-200" },
-  UNSCHEDULED: { label: "非计划性", color: "bg-orange-50 text-orange-700 border-orange-200" },
-  EMERGENCY: { label: "紧急", color: "bg-red-50 text-red-700 border-red-200" },
-};
-
-// 优先级
-const PRIORITY = {
-  CRITICAL: { label: "紧急", color: "bg-red-500" },
-  HIGH: { label: "高", color: "bg-orange-500" },
-  MEDIUM: { label: "中", color: "bg-yellow-500" },
-  LOW: { label: "低", color: "bg-slate-400" },
+// Status icons
+const STATUS_ICONS: Record<WorkOrderStatus, typeof Clock> = {
+  DRAFT: Clock,
+  OPEN: Clock,
+  IN_PROGRESS: Wrench,
+  PENDING_PARTS: AlertCircle,
+  PENDING_INSPECTION: AlertCircle,
+  COMPLETED: CheckCircle2,
+  RELEASED: CheckCircle2,
+  CANCELLED: XCircle,
 };
 
 /**
@@ -76,132 +60,45 @@ export function WorkOrderListPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [aircraftList, setAircraftList] = useState<Aircraft[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock work orders
-  const workOrders = [
-    {
-      id: "wo-001",
-      workOrderNumber: "WO-2026-0116",
-      title: "电机定期检查 - B-7011U",
-      description: "每50飞行小时检查电机状态，测试电机转速和温度",
-      type: "SCHEDULED" as const,
-      priority: "HIGH" as const,
-      status: "IN_PROGRESS" as const,
-      aircraftId: "ac-001",
-      aircraftRegistration: "B-7011U",
-      scheduleId: "ms-001",
-      assignedTo: "张三",
-      createdAt: "2026-01-15",
-      dueDate: "2026-01-20",
-      estimatedHours: 2,
-      actualHours: 1.5,
-      taskCount: 5,
-      completedTasks: 3,
-    },
-    {
-      id: "wo-002",
-      workOrderNumber: "WO-2026-0115",
-      title: "螺旋桨更换 - B-7011U",
-      description: "更换4片螺旋桨，进行动平衡测试",
-      type: "SCHEDULED" as const,
-      priority: "MEDIUM" as const,
-      status: "PENDING" as const,
-      aircraftId: "ac-001",
-      aircraftRegistration: "B-7011U",
-      scheduleId: "ms-002",
-      assignedTo: "李四",
-      createdAt: "2026-01-14",
-      dueDate: "2026-01-22",
-      estimatedHours: 3,
-      actualHours: null,
-      taskCount: 8,
-      completedTasks: 0,
-    },
-    {
-      id: "wo-003",
-      workOrderNumber: "WO-2026-0114",
-      title: "紧急维修 - GPS故障 - B-7012U",
-      description: "GPS模块无信号，需要紧急检查和更换",
-      type: "EMERGENCY" as const,
-      priority: "CRITICAL" as const,
-      status: "INSPECTION_REQUIRED" as const,
-      aircraftId: "ac-002",
-      aircraftRegistration: "B-7012U",
-      scheduleId: null,
-      assignedTo: "王五",
-      createdAt: "2026-01-16",
-      dueDate: "2026-01-16",
-      estimatedHours: 4,
-      actualHours: 3.5,
-      taskCount: 6,
-      completedTasks: 6,
-    },
-    {
-      id: "wo-004",
-      workOrderNumber: "WO-2026-0113",
-      title: "180天日历检查 - B-7013U",
-      description: "每180天进行的全面检查，包括所有系统",
-      type: "SCHEDULED" as const,
-      priority: "HIGH" as const,
-      status: "PENDING" as const,
-      aircraftId: "ac-003",
-      aircraftRegistration: "B-7013U",
-      scheduleId: "ms-003",
-      assignedTo: null,
-      createdAt: "2026-01-13",
-      dueDate: "2026-01-18",
-      estimatedHours: 8,
-      actualHours: null,
-      taskCount: 20,
-      completedTasks: 0,
-    },
-    {
-      id: "wo-005",
-      workOrderNumber: "WO-2026-0112",
-      title: "电池包更换 - B-7012U",
-      description: "电池循环接近300次，需要更换电池包",
-      type: "UNSCHEDULED" as const,
-      priority: "MEDIUM" as const,
-      status: "COMPLETED" as const,
-      aircraftId: "ac-002",
-      aircraftRegistration: "B-7012U",
-      scheduleId: "ms-004",
-      assignedTo: "赵六",
-      createdAt: "2026-01-10",
-      dueDate: "2026-01-15",
-      estimatedHours: 1,
-      actualHours: 1,
-      taskCount: 3,
-      completedTasks: 3,
-      completedAt: "2026-01-14",
-    },
-    {
-      id: "wo-006",
-      workOrderNumber: "WO-2026-0111",
-      title: "机架紧固检查 - B-7013U",
-      description: "检查机架所有紧固件扭矩",
-      type: "SCHEDULED" as const,
-      priority: "LOW" as const,
-      status: "CANCELLED" as const,
-      aircraftId: "ac-003",
-      aircraftRegistration: "B-7013U",
-      scheduleId: null,
-      assignedTo: "钱七",
-      createdAt: "2026-01-08",
-      dueDate: "2026-01-12",
-      estimatedHours: 2,
-      actualHours: null,
-      taskCount: 4,
-      completedTasks: 0,
-    },
-  ];
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [ordersData, aircraftData] = await Promise.all([
+        workOrderService.getRecent(100),
+        fullAircraftService.list(),
+      ]);
+
+      setWorkOrders(ordersData);
+      setAircraftList(aircraftData);
+    } catch (err) {
+      console.error("Failed to load work orders:", err);
+      setError("加载工单失败");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Build aircraft lookup map
+  const aircraftMap = new Map(aircraftList.map((a) => [a.id, a]));
 
   // Filter work orders
   const filteredWorkOrders = workOrders.filter((wo) => {
+    const aircraft = aircraftMap.get(wo.aircraftId);
     const matchesSearch =
-      wo.workOrderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      wo.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       wo.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      wo.aircraftRegistration.toLowerCase().includes(searchQuery.toLowerCase());
+      aircraft?.registration?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = statusFilter === "all" || wo.status === statusFilter;
     const matchesType = typeFilter === "all" || wo.type === typeFilter;
@@ -218,29 +115,21 @@ export function WorkOrderListPage() {
     {} as Record<string, number>
   );
 
-  // Priority badge
-  const PriorityBadge = ({ priority }: { priority: keyof typeof PRIORITY }) => {
-    return (
-      <div className="flex items-center gap-1">
-        <div className={`h-2 w-2 rounded-full ${PRIORITY[priority].color}`} />
-        <span className="text-xs text-muted-foreground">{PRIORITY[priority].label}</span>
-      </div>
-    );
+  // Format date from timestamp
+  const formatDate = (timestamp: number | null) => {
+    if (!timestamp) return "-";
+    return new Date(timestamp).toLocaleDateString("zh-CN");
   };
 
-  // Task progress
-  const TaskProgress = ({ completed, total }: { completed: number; total: number }) => {
-    const progress = (completed / total) * 100;
+  // Priority badge
+  const PriorityBadge = ({ priority }: { priority: WorkOrderPriority }) => {
     return (
-      <div className="flex items-center gap-2">
-        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden max-w-[100px]">
-          <div
-            className="h-full bg-green-500 rounded-full transition-all"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
+      <div className="flex items-center gap-1">
+        <div
+          className={`h-2 w-2 rounded-full ${WORK_ORDER_PRIORITY_COLORS[priority]}`}
+        />
         <span className="text-xs text-muted-foreground">
-          {completed}/{total}
+          {WORK_ORDER_PRIORITY_LABELS[priority]}
         </span>
       </div>
     );
@@ -248,17 +137,20 @@ export function WorkOrderListPage() {
 
   // Kanban board
   const KanbanBoard = () => {
-    const columns: Array<{ key: string; label: string; status: string }> = [
-      { key: "pending", label: "待处理", status: "PENDING" },
-      { key: "in-progress", label: "进行中", status: "IN_PROGRESS" },
-      { key: "inspection", label: "待检验", status: "INSPECTION_REQUIRED" },
-      { key: "completed", label: "已完成", status: "COMPLETED" },
-    ];
+    const columns: Array<{ key: string; label: string; status: WorkOrderStatus }> =
+      [
+        { key: "open", label: "待处理", status: "OPEN" },
+        { key: "in-progress", label: "进行中", status: "IN_PROGRESS" },
+        { key: "inspection", label: "待检验", status: "PENDING_INSPECTION" },
+        { key: "completed", label: "已完成", status: "COMPLETED" },
+      ];
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {columns.map((column) => {
-          const columnOrders = filteredWorkOrders.filter((wo) => wo.status === column.status);
+          const columnOrders = filteredWorkOrders.filter(
+            (wo) => wo.status === column.status
+          );
 
           return (
             <div key={column.key} className="bg-slate-50 rounded-lg p-4">
@@ -269,25 +161,33 @@ export function WorkOrderListPage() {
                 </Badge>
               </div>
               <div className="space-y-3">
-                {columnOrders.map((wo) => (
-                  <div
-                    key={wo.id}
-                    className="bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => {/* Navigate to detail */}}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`h-2 w-2 rounded-full ${PRIORITY[wo.priority].color}`} />
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {wo.workOrderNumber}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium mb-1 line-clamp-2">{wo.title}</p>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      {wo.aircraftRegistration}
-                    </p>
-                    <TaskProgress completed={wo.completedTasks} total={wo.taskCount} />
-                  </div>
-                ))}
+                {columnOrders.map((wo) => {
+                  const aircraft = aircraftMap.get(wo.aircraftId);
+                  return (
+                    <Link
+                      key={wo.id}
+                      to={`/work-orders/${wo.id}`}
+                      className="block bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div
+                          className={`h-2 w-2 rounded-full ${
+                            WORK_ORDER_PRIORITY_COLORS[wo.priority]
+                          }`}
+                        />
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {wo.orderNumber}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium mb-1 line-clamp-2">
+                        {wo.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {aircraft?.registration || "未知飞机"}
+                      </p>
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           );
@@ -296,15 +196,63 @@ export function WorkOrderListPage() {
     );
   };
 
+  // Loading skeleton
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <Skeleton className="h-8 w-32 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="pb-3">
+                <Skeleton className="h-3 w-16" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-6 w-12" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
+        <h3 className="text-lg font-semibold mb-2">加载失败</h3>
+        <p className="text-muted-foreground mb-4">{error}</p>
+        <Button onClick={loadData}>重试</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">工单管理</h1>
-          <p className="text-muted-foreground">
-            创建、分配和跟踪维修工单
-          </p>
+          <p className="text-muted-foreground">创建、分配和跟踪维修工单</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -323,9 +271,11 @@ export function WorkOrderListPage() {
           >
             <Wrench className="w-4 h-4" />
           </Button>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            新建工单
+          <Button asChild>
+            <Link to="/work-orders/new">
+              <Plus className="w-4 h-4 mr-2" />
+              新建工单
+            </Link>
           </Button>
         </div>
       </div>
@@ -350,7 +300,7 @@ export function WorkOrderListPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl font-bold text-slate-600">
-              {statusCounts.PENDING || 0}
+              {(statusCounts.DRAFT || 0) + (statusCounts.OPEN || 0)}
             </div>
           </CardContent>
         </Card>
@@ -374,7 +324,7 @@ export function WorkOrderListPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl font-bold text-yellow-600">
-              {statusCounts.INSPECTION_REQUIRED || 0}
+              {statusCounts.PENDING_INSPECTION || 0}
             </div>
           </CardContent>
         </Card>
@@ -386,7 +336,7 @@ export function WorkOrderListPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl font-bold text-green-600">
-              {statusCounts.COMPLETED || 0}
+              {(statusCounts.COMPLETED || 0) + (statusCounts.RELEASED || 0)}
             </div>
           </CardContent>
         </Card>
@@ -398,7 +348,13 @@ export function WorkOrderListPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl font-bold text-red-600">
-              {workOrders.filter((wo) => wo.priority === "CRITICAL" && wo.status !== "COMPLETED").length}
+              {
+                workOrders.filter(
+                  (wo) =>
+                    wo.priority === "CRITICAL" &&
+                    !["COMPLETED", "RELEASED", "CANCELLED"].includes(wo.status)
+                ).length
+              }
             </div>
           </CardContent>
         </Card>
@@ -413,15 +369,25 @@ export function WorkOrderListPage() {
         >
           全部 ({workOrders.length})
         </Button>
-        {Object.entries(WORK_ORDER_STATUS).map(([key, { label, color }]) => (
+        {(
+          [
+            "OPEN",
+            "IN_PROGRESS",
+            "PENDING_INSPECTION",
+            "COMPLETED",
+            "CANCELLED",
+          ] as WorkOrderStatus[]
+        ).map((status) => (
           <Button
-            key={key}
-            variant={statusFilter === key ? "default" : "outline"}
+            key={status}
+            variant={statusFilter === status ? "default" : "outline"}
             size="sm"
-            onClick={() => setStatusFilter(key)}
-            className={statusFilter === key ? color : ""}
+            onClick={() => setStatusFilter(status)}
+            className={
+              statusFilter === status ? WORK_ORDER_STATUS_COLORS[status] : ""
+            }
           >
-            {label} ({statusCounts[key] || 0})
+            {WORK_ORDER_STATUS_LABELS[status]} ({statusCounts[status] || 0})
           </Button>
         ))}
       </div>
@@ -445,7 +411,7 @@ export function WorkOrderListPage() {
               className="h-10 px-3 rounded-md border border-input bg-background text-sm"
             >
               <option value="all">全部类型</option>
-              {Object.entries(WORK_ORDER_TYPES).map(([key, { label }]) => (
+              {Object.entries(WORK_ORDER_TYPE_LABELS).map(([key, label]) => (
                 <option key={key} value={key}>
                   {label}
                 </option>
@@ -462,9 +428,7 @@ export function WorkOrderListPage() {
         <Card>
           <CardHeader>
             <CardTitle>工单列表</CardTitle>
-            <CardDescription>
-              共 {filteredWorkOrders.length} 个工单
-            </CardDescription>
+            <CardDescription>共 {filteredWorkOrders.length} 个工单</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -490,13 +454,10 @@ export function WorkOrderListPage() {
                       状态
                     </th>
                     <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                      负责人
+                      计划日期
                     </th>
                     <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                      到期日
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                      进度
+                      创建时间
                     </th>
                     <th className="text-right py-3 px-4 font-medium text-sm text-muted-foreground">
                       操作
@@ -505,7 +466,8 @@ export function WorkOrderListPage() {
                 </thead>
                 <tbody>
                   {filteredWorkOrders.map((wo) => {
-                    const StatusIcon = WORK_ORDER_STATUS[wo.status].icon;
+                    const StatusIcon = STATUS_ICONS[wo.status];
+                    const aircraft = aircraftMap.get(wo.aircraftId);
 
                     return (
                       <tr key={wo.id} className="border-b hover:bg-muted/50">
@@ -517,7 +479,7 @@ export function WorkOrderListPage() {
                             to={`/work-orders/${wo.id}`}
                             className="font-mono text-sm text-primary hover:underline"
                           >
-                            {wo.workOrderNumber}
+                            {wo.orderNumber}
                           </Link>
                         </td>
                         <td className="py-3 px-4">
@@ -528,54 +490,60 @@ export function WorkOrderListPage() {
                             >
                               {wo.title}
                             </Link>
-                            <p className="text-xs text-muted-foreground line-clamp-1 max-w-[200px]">
-                              {wo.description}
-                            </p>
+                            {wo.description && (
+                              <p className="text-xs text-muted-foreground line-clamp-1 max-w-[200px]">
+                                {wo.description}
+                              </p>
+                            )}
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <Link
-                            to={`/aircraft/${wo.aircraftId}`}
-                            className="text-sm text-primary hover:underline"
-                          >
-                            {wo.aircraftRegistration}
-                          </Link>
-                        </td>
-                        <td className="py-3 px-4">
-                          <Badge className={WORK_ORDER_TYPES[wo.type].color}>
-                            {WORK_ORDER_TYPES[wo.type].label}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">
-                          <Badge className={WORK_ORDER_STATUS[wo.status].color}>
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {WORK_ORDER_STATUS[wo.status].label}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">
-                          {wo.assignedTo ? (
-                            <div className="flex items-center gap-1">
-                              <User className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-sm">{wo.assignedTo}</span>
-                            </div>
+                          {aircraft ? (
+                            <Link
+                              to={`/aircraft/${wo.aircraftId}`}
+                              className="text-sm text-primary hover:underline"
+                            >
+                              {aircraft.registration}
+                            </Link>
                           ) : (
-                            <span className="text-sm text-muted-foreground">未分配</span>
+                            <span className="text-sm text-muted-foreground">
+                              未知
+                            </span>
                           )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge
+                            className={
+                              WORK_ORDER_TYPE_COLORS[wo.type as WorkOrderType] ||
+                              "bg-slate-50 text-slate-700"
+                            }
+                          >
+                            {WORK_ORDER_TYPE_LABELS[wo.type as WorkOrderType] ||
+                              wo.type}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge className={WORK_ORDER_STATUS_COLORS[wo.status]}>
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {WORK_ORDER_STATUS_LABELS[wo.status]}
+                          </Badge>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-1 text-sm">
                             <Calendar className="h-3 w-3 text-muted-foreground" />
-                            <span className={new Date(wo.dueDate) < new Date() && wo.status !== "COMPLETED" ? "text-red-600" : ""}>
-                              {wo.dueDate}
-                            </span>
+                            <span>{formatDate(wo.scheduledEnd)}</span>
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <TaskProgress completed={wo.completedTasks} total={wo.taskCount} />
+                          <span className="text-sm text-muted-foreground">
+                            {formatDate(wo.createdAt)}
+                          </span>
                         </td>
                         <td className="py-3 px-4">
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="w-4 h-4" />
+                          <Button variant="ghost" size="icon" asChild>
+                            <Link to={`/work-orders/${wo.id}`}>
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Link>
                           </Button>
                         </td>
                       </tr>
