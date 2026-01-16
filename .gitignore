@@ -51,3 +51,8 @@ drizzle/
 # Backup
 /backup
 *.backup
+
+.turbo/
+.cache/
+.next/cache/
+.playwright-mcp/
