@@ -36,6 +36,11 @@ import { MaintenanceHistoryPage } from "./pages/maintenance-history-page";
 import { InventoryAlertsPage } from "./pages/inventory-alerts-page";
 import { PirepListPage } from "./pages/pirep-list-page";
 import { ProfileSettingsPage } from "./pages/profile-settings-page";
+import { FleetDetailPage } from "./pages/fleet-detail-page";
+import { MaintenanceCalendarPage } from "./pages/maintenance-calendar-page";
+import { LlpTrackingPage } from "./pages/llp-tracking-page";
+import { AirworthinessPage } from "./pages/airworthiness-page";
+import { NotificationsPage } from "./pages/notifications-page";
 
 /**
  * Application router configuration
@@ -65,6 +70,10 @@ export const router = createBrowserRouter([
       {
         path: "fleets",
         element: <FleetListPage />,
+      },
+      {
+        path: "fleets/:id",
+        element: <FleetDetailPage />,
       },
       // Aircraft Management
       {
@@ -112,6 +121,10 @@ export const router = createBrowserRouter([
       {
         path: "maintenance/schedules/:id",
         element: <MaintenanceSchedulePage />,
+      },
+      {
+        path: "maintenance/calendar",
+        element: <MaintenanceCalendarPage />,
       },
       // Work Order Management
       {
@@ -183,6 +196,10 @@ export const router = createBrowserRouter([
         path: "inventory/movements",
         element: <InventoryMovementsPage />,
       },
+      {
+        path: "inventory/alerts",
+        element: <InventoryAlertsPage />,
+      },
       // Component Transfers
       {
         path: "components/:id/transfers",
@@ -220,9 +237,20 @@ export const router = createBrowserRouter([
         path: "maintenance/history",
         element: <MaintenanceHistoryPage />,
       },
+      // Airworthiness
       {
-        path: "inventory/alerts",
-        element: <InventoryAlertsPage />,
+        path: "airworthiness",
+        element: <AirworthinessPage />,
+      },
+      // Life-Limited Parts Tracking
+      {
+        path: "llp/tracking",
+        element: <LlpTrackingPage />,
+      },
+      // Notifications
+      {
+        path: "notifications",
+        element: <NotificationsPage />,
       },
       // Profile
       {
