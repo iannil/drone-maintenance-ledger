@@ -488,7 +488,7 @@ export function SettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                   {Object.entries(ROLES).map(([key, { label, description }]) => (
                     <div key={key} className="flex items-start gap-2">
-                      <Badge className={ROLES[key as keyof typeof ROLES].color} className="mt-0.5">
+                      <Badge className={`${ROLES[key as keyof typeof ROLES].color} mt-0.5`}>
                         {label}
                       </Badge>
                       <span className="text-muted-foreground">{description}</span>

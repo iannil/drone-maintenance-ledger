@@ -41,6 +41,7 @@ async function apiRequest<T>(
       "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
       ...restOptions.headers,
+    },
   });
 
   // Handle errors

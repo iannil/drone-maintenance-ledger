@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
-import { Plane, LayoutDashboard, Wings, Wrench, ClipboardList, Package, BarChart3, Settings, LogOut, User, Menu, X } from "lucide-react";
+import { Plane, LayoutDashboard, Wrench, ClipboardList, Package, BarChart3, Settings, LogOut, User, Menu, X } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { authStore } from "../stores/auth.store";
 import { useState } from "react";
@@ -20,8 +20,8 @@ export function DashboardLayout() {
   const navItems = [
     { path: "/", label: "首页", icon: LayoutDashboard },
     { type: "divider", label: "资产配置" },
-    { path: "/fleets", label: "机队管理", icon: Wings },
-    { path: "/aircraft", label: "飞机管理", icon: Wings },
+    { path: "/fleets", label: "机队管理", icon: Plane },
+    { path: "/aircraft", label: "飞机管理", icon: Plane },
     { path: "/components", label: "零部件管理", icon: Package },
     { type: "divider", label: "维保管理" },
     { path: "/maintenance/schedules", label: "维保计划", icon: ClipboardList },
