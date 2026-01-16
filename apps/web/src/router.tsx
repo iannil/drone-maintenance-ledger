@@ -4,7 +4,10 @@ import { LoginPage } from "./pages/login-page";
 import { DashboardLayout } from "./pages/dashboard-layout";
 import { DashboardPage } from "./pages/dashboard-page";
 import { FleetListPage } from "./pages/fleet-list-page";
+import { AircraftListPage } from "./pages/aircraft-list-page";
 import { AircraftDetailPage } from "./pages/aircraft-detail-page";
+import { ComponentListPage } from "./pages/component-list-page";
+import { ComponentDetailPage } from "./pages/component-detail-page";
 
 /**
  * Application router configuration
@@ -30,13 +33,28 @@ export const router = createBrowserRouter([
         index: true,
         element: <DashboardPage />,
       },
+      // Fleet Management
       {
         path: "fleets",
         element: <FleetListPage />,
       },
+      // Aircraft Management
+      {
+        path: "aircraft",
+        element: <AircraftListPage />,
+      },
       {
         path: "aircraft/:id",
         element: <AircraftDetailPage />,
+      },
+      // Component Management
+      {
+        path: "components",
+        element: <ComponentListPage />,
+      },
+      {
+        path: "components/:id",
+        element: <ComponentDetailPage />,
       },
     ],
   },

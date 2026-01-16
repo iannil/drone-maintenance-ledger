@@ -4,48 +4,69 @@
 
 @layer base {
   :root {
+    /* Base colors - Slate */
     --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%; /* Blue-600 */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
+
+    /* Status colors for aviation */
+    --status-serviceable: 142.1 76.2% 36.3%; /* Green-600 */
+    --status-serviceable-bg: 142.1 76.2% 96.3%; /* Green-100 */
+    --status-maintenance: 32.6 94.6% 43.7%; /* Amber-600 */
+    --status-maintenance-bg: 48 96% 53%; /* Amber-500 */
+    --status-grounded: 0 72.2% 50.6%; /* Red-600 */
+    --status-grounded-bg: 0 72.2% 96.3%; /* Red-100 */
+    --status-retired: 215 20.2% 65.1%; /* Slate-400 */
+    --status-retired-bg: 215 20.2% 95.1%; /* Slate-100 */
+
+    /* Component status colors */
+    --component-in-stock: 217.2 91.2% 59.8%; /* Blue-500 */
+    --component-in-stock-bg: 217.2 91.2% 96.8%; /* Blue-100 */
+    --component-installed: 142.1 76.2% 36.3%; /* Green-600 */
+    --component-installed-bg: 142.1 76.2% 96.3%; /* Green-100 */
+    --component-removed: 215 20.2% 65.1%; /* Slate-400 */
+    --component-removed-bg: 215 20.2% 95.1%; /* Slate-100 */
+    --component-scrapped: 0 72.2% 50.6%; /* Red-600 */
+    --component-scrapped-bg: 0 72.2% 96.3%; /* Red-100 */
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
   }
 }
 
@@ -55,5 +76,46 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Focus visible styles */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer utilities {
+  /* Status text utilities */
+  .text-serviceable {
+    color: hsl(var(--status-serviceable));
+  }
+  .text-maintenance {
+    color: hsl(var(--status-maintenance));
+  }
+  .text-grounded {
+    color: hsl(var(--status-grounded));
+  }
+  .text-retired {
+    color: hsl(var(--status-retired));
+  }
+
+  /* Status background utilities */
+  .bg-serviceable {
+    background-color: hsl(var(--status-serviceable-bg));
+  }
+  .bg-maintenance {
+    background-color: hsl(var(--status-maintenance-bg));
+  }
+  .bg-grounded {
+    background-color: hsl(var(--status-grounded-bg));
+  }
+  .bg-retired {
+    background-color: hsl(var(--status-retired-bg));
   }
 }
