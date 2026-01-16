@@ -7,29 +7,34 @@
 
 ## 发现的问题
 
-### 1. 冗余数据库文件
+### 1. 冗余数据库文件 ✅ 已修复
 
-项目中存在多个数据库相关目录和文件，存在冗余：
+~~项目中存在多个数据库相关目录和文件，存在冗余：~~
 
-| 位置 | 说明 | 建议 |
+| 位置 | 说明 | 处理 |
 |------|------|------|
-| `database/drone-maintenance.db` | 空数据库文件 | 可删除或作为主数据库 |
+| ~~`database/drone-maintenance.db`~~ | 空数据库文件 | ✅ 已删除 |
 | `database/migrations/` | Drizzle 迁移文件 | 保留 |
-| `packages/db/data.db` | 空数据库文件 | 确认用途 |
-| `packages/database/local.db` | 167KB 数据库文件 | 似乎是实际使用的数据库 |
+| ~~`packages/db/data.db`~~ | 空数据库文件 | ✅ 已删除 |
+| ~~`packages/database/local.db`~~ | 167KB 数据库文件 | ✅ 已移动到 `database/local.db` |
+| ~~`packages/database/`~~ | 冗余目录 | ✅ 已删除 |
 
-**建议**: 统一数据库位置，清理未使用的数据库文件。根据 CLAUDE.md 说明，应使用 `database/` 作为数据库工作区（workspace 名称为 `@repo/db`），但实际包位于 `packages/db/`。
+**当前状态**: 数据库文件统一存放在 `database/local.db`，配置一致。
 
-### 2. 未使用的导入
+### 2. 未使用的导入 ✅ 已修复
 
-| 文件 | 问题 |
-|------|------|
-| `packages/types/src/api/index.ts:7` | 导入 `User` 类型但未使用 |
+| 文件 | 问题 | 处理 |
+|------|------|------|
+| ~~`packages/types/src/api/index.ts:7`~~ | 导入 `User` 类型但未使用 | ✅ 已删除 |
 
-### 3. 数据库配置不一致
+### 3. 数据库配置 ✅ 已确认一致
 
-- `packages/db/drizzle.config.ts` 配置的数据库路径可能与实际使用不一致
-- 存在三个不同位置的数据库文件
+数据库配置现已统一：
+- `.env.example`: `DATABASE_URL=./database/local.db`
+- `packages/db/drizzle.config.ts`: 默认 `../database/local.db`
+- `packages/db/src/index.ts`: 默认 `../../database/local.db`
+
+所有配置指向同一位置 `database/local.db`。
 
 ### 4. 文档与配置不一致
 
@@ -110,14 +115,15 @@ drone-maintenance-ledger/
 
 ## 建议的清理行动
 
-### 立即可执行
-1. ~~删除~~ 确认 `packages/types/src/api/index.ts` 中未使用的 `User` 导入
+### 已完成 ✅
+1. ~~删除~~ ✅ 已删除 `packages/types/src/api/index.ts` 中未使用的 `User` 导入
+2. ✅ 已统一数据库文件位置到 `database/local.db`
+3. ✅ 已删除冗余的空数据库文件和 `packages/database/` 目录
 
 ### 后续迭代
-1. 统一数据库文件位置
-2. 添加类型共享，避免枚举重复定义
-3. 逐步替换 Mock 数据为 API 调用
-4. 添加测试覆盖
+1. 添加类型共享，避免枚举重复定义
+2. 逐步替换 Mock 数据为 API 调用
+3. 添加测试覆盖
 
 ---
 

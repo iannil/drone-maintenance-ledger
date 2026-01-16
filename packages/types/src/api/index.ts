@@ -4,8 +4,6 @@
  * Request/response types for API communication
  */
 
-import type { User } from "../domain/index.js";
-
 /**
  * Login request
  */
