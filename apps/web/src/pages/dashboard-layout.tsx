@@ -36,7 +36,7 @@ export function DashboardLayout() {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-slate-50">
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b px-4 py-3">
         <div className="flex items-center justify-between">
@@ -72,7 +72,7 @@ export function DashboardLayout() {
       {/* Sidebar */}
       <aside
         className={`
-          fixed lg:sticky top-0 left-0 z-40 h-screen w-64 bg-white border-r
+          fixed lg:relative top-0 left-0 z-40 h-screen w-64 bg-white border-r flex-shrink-0
           transform transition-transform duration-200 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
@@ -148,7 +148,7 @@ export function DashboardLayout() {
       </aside>
 
       {/* Main Content */}
-      <div className="lg:ml-64">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Desktop Header */}
         <header className="hidden lg:flex h-16 items-center justify-between px-8 bg-white border-b">
           <div className="flex items-center space-x-4">
