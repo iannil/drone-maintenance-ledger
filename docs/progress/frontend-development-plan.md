@@ -24,8 +24,10 @@
 | `fleet-list-page.tsx` | ✅ | 机队列表页（卡片视图 + 搜索）|
 | `aircraft-list-page.tsx` | ✅ | 飞机列表页（表格视图 + 状态筛选）|
 | `aircraft-detail-page.tsx` | ✅ | 飞机详情页（4个标签页）|
+| `aircraft-form-page.tsx` | ✅ | 飞机表单页（创建/编辑）|
 | `component-list-page.tsx` | ✅ | 零部件列表页（表格 + 多重筛选）|
 | `component-detail-page.tsx` | ✅ | 零部件详情页（履历时间线）|
+| `component-form-page.tsx` | ✅ | 零部件表单页（创建/编辑）|
 | `auth.store.ts` | ✅ | MobX 认证状态管理 |
 | `auth.service.ts` | ✅ | 认证服务 |
 | `api.ts` | ✅ | API 客户端封装 |
@@ -43,7 +45,10 @@
 | Skeleton | `components/ui/skeleton.tsx` | ✅ |
 | Dialog | `components/ui/dialog.tsx` | ✅ |
 | Tabs | `components/ui/tabs.tsx` | ✅ |
+| Select | `components/ui/select.tsx` | ✅ |
 | StatusBadge | `components/common/status-badge.tsx` | ✅ 航空业专用 |
+| InstallComponentDialog | `components/install-component-dialog.tsx` | ✅ 装机对话框 |
+| RemoveComponentDialog | `components/remove-component-dialog.tsx` | ✅ 拆下对话框 |
 
 ### 依赖包状态
 
@@ -113,7 +118,7 @@
   - [x] 零部件列表（装机树状结构）
   - [x] 飞行记录摘要
   - [x] 维保历史摘要
-- [ ] 飞机创建/编辑表单
+- [x] 飞机创建/编辑表单
 - [ ] 飞机状态更新对话框
 
 #### 3.4 零部件管理 ✅ 已完成
@@ -123,9 +128,9 @@
   - [x] 履历时间线（装机/拆下历史）- 核心设计：零部件履历解耦
   - [x] 维保历史
   - [x] 使用统计（飞行小时、循环）
-- [ ] 零部件创建/编辑表单
-- [ ] 装机对话框
-- [ ] 拆下对话框
+- [x] 零部件创建/编辑表单
+- [x] 装机对话框
+- [x] 拆下对话框
 
 ---
 
@@ -211,9 +216,12 @@ const routes = [
       { path: "fleets", element: <FleetListPage /> }, // ✅
       { path: "fleets/:id", element: <FleetDetailPage /> }, // ⏳
       { path: "aircraft", element: <AircraftListPage /> }, // ✅
-      { path: "aircraft/new", element: <AircraftFormPage /> }, // ⏳
+      { path: "aircraft/new", element: <AircraftFormPage /> }, // ✅
+      { path: "aircraft/:id/edit", element: <AircraftFormPage /> }, // ✅
       { path: "aircraft/:id", element: <AircraftDetailPage /> }, // ✅
       { path: "components", element: <ComponentListPage /> }, // ✅
+      { path: "components/new", element: <ComponentFormPage /> }, // ✅
+      { path: "components/:id/edit", element: <ComponentFormPage /> }, // ✅
       { path: "components/:id", element: <ComponentDetailPage /> }, // ✅
 
       // 维保管理
@@ -319,8 +327,10 @@ apps/web/src/
 │   ├── fleet-list-page.tsx    ✅
 │   ├── aircraft-list-page.tsx ✅
 │   ├── aircraft-detail-page.tsx ✅
+│   ├── aircraft-form-page.tsx ✅
 │   ├── component-list-page.tsx ✅
-│   └── component-detail-page.tsx ✅
+│   ├── component-detail-page.tsx ✅
+│   └── component-form-page.tsx ✅
 ├── stores/                 # MobX stores
 ├── services/               # API 服务
 ├── lib/                    # 工具函数

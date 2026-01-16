@@ -9,6 +9,7 @@ import {
   Trash2,
   MoreHorizontal,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
@@ -25,6 +26,7 @@ import { AircraftStatusBadge } from "../components/common/status-badge";
  * Aircraft list page with search and filtering
  */
 export function AircraftListPage() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [fleetFilter, setFleetFilter] = useState<string>("all");
@@ -166,7 +168,7 @@ export function AircraftListPage() {
             管理所有飞机及其状态、飞行记录和维保信息
           </p>
         </div>
-        <Button>
+        <Button onClick={() => navigate("/aircraft/new")}>
           <Plus className="w-4 h-4 mr-2" />
           新建飞机
         </Button>
@@ -305,7 +307,7 @@ export function AircraftListPage() {
                             <MoreHorizontal className="w-4 h-4" />
                           </Link>
                         </Button>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={() => navigate(`/aircraft/${ac.id}/edit`)}>
                           <Edit2 className="w-4 h-4" />
                         </Button>
                         <Button variant="ghost" size="icon" className="text-destructive">
@@ -330,7 +332,7 @@ export function AircraftListPage() {
                   : "点击上方按钮创建第一架飞机"}
               </p>
               {!searchQuery && statusFilter === "all" && fleetFilter === "all" && (
-                <Button>
+                <Button onClick={() => navigate("/aircraft/new")}>
                   <Plus className="w-4 h-4 mr-2" />
                   新建飞机
                 </Button>

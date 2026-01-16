@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Plus,
   Search,
@@ -25,6 +25,7 @@ import { ComponentStatusBadge } from "../components/common/status-badge";
  * Component list page with search and filtering
  */
 export function ComponentListPage() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -236,7 +237,7 @@ export function ComponentListPage() {
             管理所有零部件的履历、状态和维保信息
           </p>
         </div>
-        <Button>
+        <Button onClick={() => navigate("/components/new")}>
           <Plus className="w-4 h-4 mr-2" />
           新建零部件
         </Button>
@@ -421,7 +422,7 @@ export function ComponentListPage() {
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={() => navigate(`/components/${comp.id}/edit`)}>
                           <Edit2 className="w-4 h-4" />
                         </Button>
                         <Button variant="ghost" size="icon" className="text-destructive">
@@ -452,7 +453,7 @@ export function ComponentListPage() {
                 statusFilter === "all" &&
                 typeFilter === "all" &&
                 aircraftFilter === "all" && (
-                  <Button>
+                  <Button onClick={() => navigate("/components/new")}>
                     <Plus className="w-4 h-4 mr-2" />
                     新建零部件
                   </Button>
