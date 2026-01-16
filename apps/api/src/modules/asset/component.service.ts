@@ -131,37 +131,114 @@ export class ComponentService {
    * Install component on aircraft
    *
    * This is the CORE of component history tracking:
-   * 1. Close any existing installation record
-   * 2. Create new installation record with inherited metrics
-   * 3. Component's cumulative values stay with the component
+   * 1. Validate component is airworthy
+   * 2. If component is currently installed elsewhere, remove it first
+   * 3. Create new installation record
+   * 4. Update component status
+   *
+   * IMPORTANT: Component's cumulative values (totalFlightHours, etc.) stay with
+   * the component. The installation record snapshots these values at install time
+   * for later analysis of usage per installation period.
    */
   async install(dto: InstallComponentDto) {
-    const component = await this.componentRepository.findById(dto.componentId);
-    if (!component) {
+    const componentData = await this.componentRepository.findById(dto.componentId);
+    if (!componentData) {
       throw new NotFoundException("Component not found");
     }
 
     // Check if component is airworthy
-    if (!component.isAirworthy) {
+    if (!componentData.isAirworthy) {
       throw new ConflictException("Cannot install non-airworthy component");
     }
 
-    // TODO: Close existing installation and create new one
-    // This requires transaction support for proper implementation
-    throw new Error("Installation not yet implemented - requires transaction support");
+    // Check if component is life limited and exceeded limits
+    if (componentData.isLifeLimited) {
+      if (
+        componentData.maxFlightHours &&
+        componentData.totalFlightHours >= componentData.maxFlightHours
+      ) {
+        throw new ConflictException(
+          `Component has exceeded flight hour limit (${componentData.totalFlightHours}/${componentData.maxFlightHours})`,
+        );
+      }
+      if (
+        componentData.maxCycles &&
+        componentData.totalFlightCycles >= componentData.maxCycles
+      ) {
+        throw new ConflictException(
+          `Component has exceeded cycle limit (${componentData.totalFlightCycles}/${componentData.maxCycles})`,
+        );
+      }
+    }
+
+    // Check if component is currently installed somewhere - if so, remove it first
+    const currentInstallation = await this.componentRepository.getCurrentInstallation(
+      dto.componentId,
+    );
+    if (currentInstallation) {
+      // Auto-remove from current aircraft
+      await this.componentRepository.remove(
+        dto.componentId,
+        `Auto-removed during installation to aircraft ${dto.aircraftId}`,
+      );
+    }
+
+    // Create the new installation
+    await this.componentRepository.install(
+      dto.componentId,
+      dto.aircraftId,
+      dto.location,
+      dto.installNotes,
+    );
+
+    // Update component status
+    await this.componentRepository.update(dto.componentId, {
+      status: "INSTALLED",
+      currentAircraftId: dto.aircraftId,
+      installPosition: dto.location,
+    });
+
+    return {
+      componentId: dto.componentId,
+      aircraftId: dto.aircraftId,
+      location: dto.location,
+      message: "Component installed successfully",
+    };
   }
 
   /**
    * Remove component from aircraft
+   *
+   * 1. Close the installation record
+   * 2. Update component status to REMOVED
+   * 3. Clear current aircraft association
    */
   async remove(dto: RemoveComponentDto) {
-    const component = await this.componentRepository.findById(dto.componentId);
-    if (!component) {
+    const componentData = await this.componentRepository.findById(dto.componentId);
+    if (!componentData) {
       throw new NotFoundException("Component not found");
     }
 
-    // TODO: Update installation record with removedAt timestamp
-    throw new Error("Removal not yet implemented - requires transaction support");
+    // Check if component is actually installed
+    if (componentData.status !== "INSTALLED") {
+      throw new ConflictException("Component is not currently installed");
+    }
+
+    // Close the installation record
+    await this.componentRepository.remove(dto.componentId, dto.removeNotes);
+
+    // Update component status
+    await this.componentRepository.update(dto.componentId, {
+      status: "REMOVED",
+      currentAircraftId: null,
+      installPosition: null,
+    });
+
+    return {
+      componentId: dto.componentId,
+      message: "Component removed successfully",
+      previousAircraftId: componentData.currentAircraftId,
+    };
   }
 
   /**

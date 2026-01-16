@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { eq, and, isNull, desc } from "drizzle-orm";
+import { eq, and, isNull, desc, sql } from "drizzle-orm";
 
 import type { Component, NewComponent } from "@repo/db";
 import { component, componentInstallation } from "@repo/db";
@@ -184,5 +184,95 @@ export class ComponentRepository {
           )`,
         ),
       );
+  }
+
+  /**
+   * Install component on aircraft
+   *
+   * Records the installation with the component's current cumulative metrics.
+   * This ensures that when the component is removed, we know exactly what
+   * metrics to credit to this installation period.
+   */
+  async install(
+    componentId: string,
+    aircraftId: string,
+    location: string,
+    notes?: string,
+  ): Promise<void> {
+    // Get current component metrics
+    const comp = await this.findById(componentId);
+    if (!comp) {
+      throw new NotFoundException(`Component with id ${componentId} not found`);
+    }
+
+    // Insert new installation record with current cumulative values
+    await db.insert(componentInstallation).values({
+      componentId,
+      aircraftId,
+      location,
+      installNotes: notes,
+      // Inherit the component's cumulative values at install time
+      inheritedFlightHours: comp.totalFlightHours,
+      inheritedCycles: comp.totalFlightCycles,
+      installedAt: new Date(),
+    });
+  }
+
+  /**
+   * Remove component from aircraft
+   *
+   * Closes the installation record with removal timestamp and notes.
+   * The component retains its cumulative metrics - they travel with it.
+   */
+  async remove(
+    componentId: string,
+    notes?: string,
+  ): Promise<void> {
+    // Find and close the current installation (removedAt IS NULL)
+    const result = await db
+      .update(componentInstallation)
+      .set({
+        removedAt: new Date(),
+        removeNotes: notes || null,
+      })
+      .where(
+        and(
+          eq(componentInstallation.componentId, componentId),
+          isNull(componentInstallation.removedAt),
+        ),
+      )
+      .returning();
+
+    if (!result[0]) {
+      throw new NotFoundException("No active installation found for this component");
+    }
+  }
+
+  /**
+   * Get installation history for a component
+   */
+  async getInstallationHistory(componentId: string) {
+    return db
+      .select()
+      .from(componentInstallation)
+      .where(eq(componentInstallation.componentId, componentId))
+      .orderBy(desc(componentInstallation.installedAt));
+  }
+
+  /**
+   * Get current installation for a component
+   */
+  async getCurrentInstallation(componentId: string) {
+    const result = await db
+      .select()
+      .from(componentInstallation)
+      .where(
+        and(
+          eq(componentInstallation.componentId, componentId),
+          isNull(componentInstallation.removedAt),
+        ),
+      );
+
+    return result[0] || null;
   }
 }
