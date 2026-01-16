@@ -15,6 +15,8 @@ import { WorkOrderListPage } from "./pages/work-order-list-page";
 import { WorkOrderDetailPage } from "./pages/work-order-detail-page";
 import { FlightLogListPage } from "./pages/flight-log-list-page";
 import { FlightLogDetailPage } from "./pages/flight-log-detail-page";
+import { ReportsDashboardPage } from "./pages/reports-dashboard-page";
+import { SettingsPage } from "./pages/settings-page";
 
 /**
  * Application router configuration
@@ -113,6 +115,16 @@ export const router = createBrowserRouter([
       {
         path: "flight-logs/:id/edit",
         element: <FlightLogDetailPage />,
+      },
+      // Reports
+      {
+        path: "reports",
+        element: <ReportsDashboardPage />,
+      },
+      // Settings
+      {
+        path: "settings",
+        element: <SettingsPage />,
       },
     ],
   },
