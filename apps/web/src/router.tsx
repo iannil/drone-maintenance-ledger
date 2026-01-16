@@ -46,6 +46,11 @@ import { ComponentRemovalDetailPage } from "./pages/component-removal-detail-pag
 import { TaskCardTemplatesPage } from "./pages/task-card-templates-page";
 import { SuppliersPage } from "./pages/suppliers-page";
 import { PurchaseOrdersPage } from "./pages/purchase-orders-page";
+import { WarehousesPage } from "./pages/warehouses-page";
+import { PurchaseRequestsPage } from "./pages/purchase-requests-page";
+import { ComponentBomPage } from "./pages/component-bom-page";
+import { ReliabilityAnalysisPage } from "./pages/reliability-analysis-page";
+import { MobileWorkOrderExecutePage } from "./pages/mobile-work-order-execute-page";
 
 /**
  * Application router configuration
@@ -284,6 +289,31 @@ export const router = createBrowserRouter([
       {
         path: "purchase-orders",
         element: <PurchaseOrdersPage />,
+      },
+      // Warehouses
+      {
+        path: "warehouses",
+        element: <WarehousesPage />,
+      },
+      // Purchase Requests
+      {
+        path: "purchase-requests",
+        element: <PurchaseRequestsPage />,
+      },
+      // Component BOM
+      {
+        path: "aircraft/:aircraftId/bom",
+        element: <ComponentBomPage />,
+      },
+      // Reliability Analysis
+      {
+        path: "analytics/reliability",
+        element: <ReliabilityAnalysisPage />,
+      },
+      // Mobile Work Order Execute
+      {
+        path: "mobile/work-orders/:id/execute",
+        element: <MobileWorkOrderExecutePage />,
       },
     ],
   },
