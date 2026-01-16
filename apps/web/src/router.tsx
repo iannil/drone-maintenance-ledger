@@ -41,6 +41,11 @@ import { MaintenanceCalendarPage } from "./pages/maintenance-calendar-page";
 import { LlpTrackingPage } from "./pages/llp-tracking-page";
 import { AirworthinessPage } from "./pages/airworthiness-page";
 import { NotificationsPage } from "./pages/notifications-page";
+import { ReportsDataDashboardPage } from "./pages/reports-data-dashboard-page";
+import { ComponentRemovalDetailPage } from "./pages/component-removal-detail-page";
+import { TaskCardTemplatesPage } from "./pages/task-card-templates-page";
+import { SuppliersPage } from "./pages/suppliers-page";
+import { PurchaseOrdersPage } from "./pages/purchase-orders-page";
 
 /**
  * Application router configuration
@@ -182,6 +187,10 @@ export const router = createBrowserRouter([
         path: "reports",
         element: <ReportsDashboardPage />,
       },
+      {
+        path: "reports/dashboard",
+        element: <ReportsDataDashboardPage />,
+      },
       // Settings
       {
         path: "settings",
@@ -218,6 +227,10 @@ export const router = createBrowserRouter([
       {
         path: "components/removals",
         element: <ComponentRemovalsPage />,
+      },
+      {
+        path: "components/removals/:id",
+        element: <ComponentRemovalDetailPage />,
       },
       // Advanced Search
       {
@@ -256,6 +269,21 @@ export const router = createBrowserRouter([
       {
         path: "profile/settings",
         element: <ProfileSettingsPage />,
+      },
+      // Task Card Templates
+      {
+        path: "templates/task-cards",
+        element: <TaskCardTemplatesPage />,
+      },
+      // Suppliers
+      {
+        path: "suppliers",
+        element: <SuppliersPage />,
+      },
+      // Purchase Orders
+      {
+        path: "purchase-orders",
+        element: <PurchaseOrdersPage />,
       },
     ],
   },
