@@ -31,6 +31,11 @@ import { RolesPage } from "./pages/roles-page";
 import { ComponentRemovalsPage } from "./pages/component-removals-page";
 import { FlightLogSearchPage } from "./pages/flight-log-search-page";
 import { WorkOrderSearchPage } from "./pages/work-order-search-page";
+import { FlightStatsPage } from "./pages/flight-stats-page";
+import { MaintenanceHistoryPage } from "./pages/maintenance-history-page";
+import { InventoryAlertsPage } from "./pages/inventory-alerts-page";
+import { PirepListPage } from "./pages/pirep-list-page";
+import { ProfileSettingsPage } from "./pages/profile-settings-page";
 
 /**
  * Application router configuration
@@ -155,6 +160,10 @@ export const router = createBrowserRouter([
         path: "pirep/new",
         element: <PirepFormPage />,
       },
+      {
+        path: "pirep",
+        element: <PirepListPage />,
+      },
       // Reports
       {
         path: "reports",
@@ -201,6 +210,24 @@ export const router = createBrowserRouter([
       {
         path: "work-orders/search",
         element: <WorkOrderSearchPage />,
+      },
+      // Analytics
+      {
+        path: "analytics/flight-stats",
+        element: <FlightStatsPage />,
+      },
+      {
+        path: "maintenance/history",
+        element: <MaintenanceHistoryPage />,
+      },
+      {
+        path: "inventory/alerts",
+        element: <InventoryAlertsPage />,
+      },
+      // Profile
+      {
+        path: "profile/settings",
+        element: <ProfileSettingsPage />,
       },
     ],
   },
