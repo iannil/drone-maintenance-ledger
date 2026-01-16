@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
-import { Plane, LayoutDashboard, Wrench, ClipboardList, Package, BarChart3, Settings, LogOut, User, Menu, X } from "lucide-react";
+import { Plane, LayoutDashboard, Wrench, ClipboardList, Package, BarChart3, Settings, LogOut, User, Menu, X, Warehouse } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { authStore } from "../stores/auth.store";
 import { useState } from "react";
@@ -23,6 +23,7 @@ export function DashboardLayout() {
     { path: "/fleets", label: "机队管理", icon: Plane },
     { path: "/aircraft", label: "飞机管理", icon: Plane },
     { path: "/components", label: "零部件管理", icon: Package },
+    { path: "/inventory", label: "库存管理", icon: Warehouse },
     { type: "divider", label: "维保管理" },
     { path: "/maintenance/schedules", label: "维保计划", icon: ClipboardList },
     { path: "/work-orders", label: "工单管理", icon: Wrench },

@@ -15,8 +15,11 @@ import { WorkOrderListPage } from "./pages/work-order-list-page";
 import { WorkOrderDetailPage } from "./pages/work-order-detail-page";
 import { FlightLogListPage } from "./pages/flight-log-list-page";
 import { FlightLogDetailPage } from "./pages/flight-log-detail-page";
+import { FlightLogFormPage } from "./pages/flight-log-form-page";
 import { ReportsDashboardPage } from "./pages/reports-dashboard-page";
 import { SettingsPage } from "./pages/settings-page";
+import { WorkOrderFormPage } from "./pages/work-order-form-page";
+import { InventoryPage } from "./pages/inventory-page";
 
 /**
  * Application router configuration
@@ -96,12 +99,16 @@ export const router = createBrowserRouter([
         element: <WorkOrderListPage />,
       },
       {
+        path: "work-orders/new",
+        element: <WorkOrderFormPage />,
+      },
+      {
         path: "work-orders/:id",
         element: <WorkOrderDetailPage />,
       },
       {
         path: "work-orders/:id/edit",
-        element: <WorkOrderDetailPage />,
+        element: <WorkOrderFormPage />,
       },
       // Flight Logs
       {
@@ -109,12 +116,16 @@ export const router = createBrowserRouter([
         element: <FlightLogListPage />,
       },
       {
+        path: "flight-logs/new",
+        element: <FlightLogFormPage />,
+      },
+      {
         path: "flight-logs/:id",
         element: <FlightLogDetailPage />,
       },
       {
         path: "flight-logs/:id/edit",
-        element: <FlightLogDetailPage />,
+        element: <FlightLogFormPage />,
       },
       // Reports
       {
@@ -125,6 +136,11 @@ export const router = createBrowserRouter([
       {
         path: "settings",
         element: <SettingsPage />,
+      },
+      // Inventory Management
+      {
+        path: "inventory",
+        element: <InventoryPage />,
       },
     ],
   },
