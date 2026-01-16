@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -10,39 +11,66 @@ import {
   TrendingUp,
   Clock,
   CheckCircle2,
-  ArrowRight,
-  Users,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { authStore } from "../stores/auth.store";
+import { statsService, DashboardStats, RecentActivity, DueMaintenanceItem } from "../services/stats.service";
+
+/**
+ * Format relative time from ISO date string
+ */
+function formatRelativeTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMins < 60) return `${diffMins}分钟前`;
+  if (diffHours < 24) return `${diffHours}小时前`;
+  if (diffDays === 1) return "昨天";
+  if (diffDays < 7) return `${diffDays}天前`;
+  return date.toLocaleDateString("zh-CN");
+}
 
 /**
  * Dashboard home page with statistics and quick actions
  */
 export function DashboardPage() {
-  // TODO: Replace with real data from API
-  const stats = {
-    totalAircraft: 12,
-    serviceable: 8,
-    maintenance: 3,
-    grounded: 1,
-    totalFleets: 3,
-    pendingWorkOrders: 5,
-    dueMaintenance: 7,
-  };
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [activities, setActivities] = useState<RecentActivity[]>([]);
+  const [dueMaintenanceItems, setDueMaintenanceItems] = useState<DueMaintenanceItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const recentActivities = [
-    { id: 1, type: "maintenance", message: "B-7011U 完成定期维护", time: "2小时前" },
-    { id: 2, type: "flight", message: "B-7012U 完成飞行记录 #1234", time: "4小时前" },
-    { id: 3, type: "warning", message: "B-7013U 达到维保预警阈值", time: "昨天" },
-    { id: 4, type: "workorder", message: "工单 #WO-2024-001 已创建", time: "昨天" },
-  ];
+  useEffect(() => {
+    async function loadDashboardData() {
+      setIsLoading(true);
+      try {
+        const [statsData, activitiesData, maintenanceData] = await Promise.all([
+          statsService.getDashboardStats(),
+          statsService.getRecentActivities(10),
+          statsService.getDueMaintenanceItems(5),
+        ]);
+        setStats(statsData);
+        setActivities(activitiesData);
+        setDueMaintenanceItems(maintenanceData);
+      } catch (error) {
+        console.error("Failed to load dashboard data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadDashboardData();
+  }, []);
 
-  const dueMaintenanceItems = [
-    { id: 1, aircraft: "B-7011U", component: "电机 #1 (SN-M001)", type: "飞行小时", dueIn: "5小时内", status: "urgent" },
-    { id: 2, aircraft: "B-7012U", component: "桨叶组 (SN-P002)", type: "日历日", dueIn: "2天后", status: "warning" },
-    { id: 3, aircraft: "B-7013U", component: "电池包 #3 (SN-B003)", type: "电池循环", dueIn: "3天后", status: "warning" },
-  ];
+  // Calculate derived stats
+  const totalAircraft = stats?.totalAircraft || 0;
+  const serviceable = stats?.aircraftByStatus.serviceable || 0;
+  const maintenance = stats?.aircraftByStatus.maintenance || 0;
+  const grounded = stats?.aircraftByStatus.grounded || 0;
+  const pendingWorkOrders = (stats?.workOrders.pending || 0) + (stats?.workOrders.inProgress || 0);
+  const availabilityRate = totalAircraft > 0 ? Math.round((serviceable / totalAircraft) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -74,10 +102,16 @@ export function DashboardPage() {
             <Plane className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalAircraft}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              分布在 {stats.totalFleets} 个机队
-            </p>
+            {isLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{totalAircraft}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  分布在 {stats?.totalFleets || 0} 个机队
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -88,10 +122,16 @@ export function DashboardPage() {
             <CheckCircle2 className="w-4 h-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-serviceable">{stats.serviceable}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {Math.round((stats.serviceable / stats.totalAircraft) * 100)}% 可用率
-            </p>
+            {isLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-green-600">{serviceable}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {availabilityRate}% 可用率
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -102,10 +142,16 @@ export function DashboardPage() {
             <Wrench className="w-4 h-4 text-amber-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-maintenance">{stats.maintenance}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.pendingWorkOrders} 个待处理工单
-            </p>
+            {isLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-amber-600">{maintenance}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {pendingWorkOrders} 个待处理工单
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -116,10 +162,16 @@ export function DashboardPage() {
             <AlertCircle className="w-4 h-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-grounded">{stats.grounded}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              需要立即处理
-            </p>
+            {isLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-red-600">{grounded}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {grounded > 0 ? "需要立即处理" : "全部正常"}
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -140,7 +192,13 @@ export function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {dueMaintenanceItems.length === 0 ? (
+            {isLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
+            ) : dueMaintenanceItems.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <CheckCircle2 className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p>暂无维保预警</p>
@@ -165,7 +223,7 @@ export function DashboardPage() {
                       </p>
                     </div>
                     <Button variant="outline" size="sm" asChild>
-                      <Link to={`/work-orders/new?aircraft=${item.aircraft}`}>
+                      <Link to={`/work-orders/new?aircraft=${item.aircraftId}`}>
                         创建工单
                       </Link>
                     </Button>
@@ -183,26 +241,41 @@ export function DashboardPage() {
             <CardDescription>系统动态和操作记录</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentActivities.map((activity) => {
-                const icon = {
-                  maintenance: <Wrench className="w-4 h-4 text-amber-600" />,
-                  flight: <Plane className="w-4 h-4 text-blue-600" />,
-                  warning: <AlertCircle className="w-4 h-4 text-red-600" />,
-                  workorder: <Clock className="w-4 h-4 text-purple-600" />,
-                }[activity.type];
+            {isLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : activities.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>暂无活动记录</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {activities.map((activity) => {
+                  const icon = {
+                    maintenance: <Wrench className="w-4 h-4 text-amber-600" />,
+                    flight: <Plane className="w-4 h-4 text-blue-600" />,
+                    warning: <AlertCircle className="w-4 h-4 text-red-600" />,
+                    workorder: <Clock className="w-4 h-4 text-purple-600" />,
+                  }[activity.type];
 
-                return (
-                  <div key={activity.id} className="flex gap-3">
-                    <div className="mt-0.5">{icon}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm">{activity.message}</p>
-                      <p className="text-xs text-muted-foreground">{activity.time}</p>
+                  return (
+                    <div key={activity.id} className="flex gap-3">
+                      <div className="mt-0.5">{icon}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm">{activity.message}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatRelativeTime(activity.time)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -228,9 +301,9 @@ export function DashboardPage() {
               </Link>
             </Button>
             <Button variant="outline" className="h-auto flex-col gap-2 py-4" asChild>
-              <Link to="/components/install">
+              <Link to="/components">
                 <Package className="w-5 h-5" />
-                <span>装机/拆下</span>
+                <span>零部件管理</span>
               </Link>
             </Button>
             <Button variant="outline" className="h-auto flex-col gap-2 py-4" asChild>

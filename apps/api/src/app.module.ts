@@ -6,6 +6,7 @@ import { UserModule } from "./modules/user/user.module";
 import { AssetModule } from "./modules/asset/asset.module";
 import { FlightModule } from "./modules/flight/flight.module";
 import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
+import { StatsModule } from "./modules/stats/stats.module";
 
 @Module({
   imports: [
@@ -21,11 +22,11 @@ import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
     AssetModule,
     FlightModule,
     MaintenanceModule,
+    StatsModule,
 
     // TODO: Add more modules as we build them
     // PlanningModule,
     // InventoryModule,
-    // DashboardModule,
   ],
   controllers: [],
   providers: [],

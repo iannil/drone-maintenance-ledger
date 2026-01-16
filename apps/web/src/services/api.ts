@@ -10,7 +10,40 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
  * API request options
  */
 interface RequestOptions extends RequestInit {
-  params?: Record<string, string | number>;
+  params?: Record<string, string | number | undefined>;
+  skipAuthRedirect?: boolean;
+}
+
+/**
+ * API Error class with status code
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public code?: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+/**
+ * Error event listeners for global error handling
+ */
+type ErrorListener = (error: ApiError) => void;
+const errorListeners: ErrorListener[] = [];
+
+export function onApiError(listener: ErrorListener): () => void {
+  errorListeners.push(listener);
+  return () => {
+    const index = errorListeners.indexOf(listener);
+    if (index > -1) errorListeners.splice(index, 1);
+  };
+}
+
+function notifyError(error: ApiError): void {
+  errorListeners.forEach((listener) => listener(error));
 }
 
 /**
@@ -20,15 +53,20 @@ async function apiRequest<T>(
   endpoint: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { params, ...restOptions } = options;
+  const { params, skipAuthRedirect, ...restOptions } = options;
 
   // Build URL with query params
   let url = `${API_URL}${endpoint}`;
   if (params) {
-    const searchParams = new URLSearchParams(
-      Object.entries(params).map(([k, v]) => [k, String(v)]) as [string, string][],
+    const filteredParams = Object.entries(params).filter(
+      ([, v]) => v !== undefined && v !== null && v !== "",
     );
-    url += `?${searchParams}`;
+    if (filteredParams.length > 0) {
+      const searchParams = new URLSearchParams(
+        filteredParams.map(([k, v]) => [k, String(v)]),
+      );
+      url += `?${searchParams}`;
+    }
   }
 
   // Get auth token
@@ -46,8 +84,28 @@ async function apiRequest<T>(
 
   // Handle errors
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: "Network error" }));
-    throw new Error(error.message || "Request failed");
+    const errorData = await response.json().catch(() => ({ message: "Network error" }));
+    const error = new ApiError(
+      errorData.message || "Request failed",
+      response.status,
+      errorData.code,
+    );
+
+    // Handle 401 Unauthorized - redirect to login
+    if (response.status === 401 && !skipAuthRedirect) {
+      localStorage.removeItem("accessToken");
+      window.location.href = "/login";
+      throw error;
+    }
+
+    // Notify global error listeners
+    notifyError(error);
+    throw error;
+  }
+
+  // Handle empty response (204 No Content)
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return response.json();

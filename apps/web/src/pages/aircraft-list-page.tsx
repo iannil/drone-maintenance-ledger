@@ -1,15 +1,14 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Plus,
   Search,
-  Filter,
   Plane,
   Edit2,
   Trash2,
   MoreHorizontal,
+  Loader2,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
@@ -19,8 +18,40 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
-import { Badge } from "../components/ui/badge";
+import { Skeleton } from "../components/ui/skeleton";
 import { AircraftStatusBadge } from "../components/common/status-badge";
+import { fullAircraftService, fleetService, Aircraft, Fleet, AircraftStatus } from "../services/fleet.service";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
+import { api } from "../services/api";
+
+/**
+ * Map backend status to frontend status badge
+ */
+const STATUS_MAP: Record<AircraftStatus, "SERVICEABLE" | "MAINTENANCE" | "GROUNDED" | "RETIRED"> = {
+  AVAILABLE: "SERVICEABLE",
+  IN_MAINTENANCE: "MAINTENANCE",
+  AOG: "GROUNDED",
+  RETIRED: "RETIRED",
+};
+
+/**
+ * Status display labels
+ */
+const STATUS_LABELS: Record<AircraftStatus, string> = {
+  AVAILABLE: "可用",
+  IN_MAINTENANCE: "维护中",
+  AOG: "停飞",
+  RETIRED: "退役",
+};
 
 /**
  * Aircraft list page with search and filtering
@@ -30,133 +61,77 @@ export function AircraftListPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [fleetFilter, setFleetFilter] = useState<string>("all");
+  const [aircraft, setAircraft] = useState<Aircraft[]>([]);
+  const [fleets, setFleets] = useState<Fleet[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [deleteAircraftId, setDeleteAircraftId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Mock data - TODO: Replace with API call
-  const fleets = [
-    { id: "fleet-001", name: "巡检机队A", code: "INSP-A" },
-    { id: "fleet-002", name: "物流机队B", code: "LOG-B" },
-    { id: "fleet-003", name: "测绘机队C", code: "SURV-C" },
-  ];
+  // Load aircraft and fleets
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true);
+      try {
+        const [aircraftData, fleetData] = await Promise.all([
+          fullAircraftService.list(),
+          fleetService.list(),
+        ]);
+        setAircraft(aircraftData);
+        setFleets(fleetData);
+      } catch (error) {
+        console.error("Failed to load data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
-  const aircraft = [
-    {
-      id: "ac-001",
-      registration: "B-7011U",
-      model: "DJI M350 RTK",
-      fleetId: "fleet-001",
-      fleetName: "巡检机队A",
-      status: "SERVICEABLE" as const,
-      totalFlightHours: 125.5,
-      totalFlightCycles: 89,
-      lastFlightDate: "2026-01-15",
-      location: "基地停机坪",
-    },
-    {
-      id: "ac-002",
-      registration: "B-7012U",
-      model: "DJI M350 RTK",
-      fleetId: "fleet-001",
-      fleetName: "巡检机队A",
-      status: "SERVICEABLE" as const,
-      totalFlightHours: 98.2,
-      totalFlightCycles: 72,
-      lastFlightDate: "2026-01-14",
-      location: "巡检任务中",
-    },
-    {
-      id: "ac-003",
-      registration: "B-7013U",
-      model: "DJI M350 RTK",
-      fleetId: "fleet-001",
-      fleetName: "巡检机队A",
-      status: "MAINTENANCE" as const,
-      totalFlightHours: 156.8,
-      totalFlightCycles: 112,
-      lastFlightDate: "2026-01-10",
-      location: "维修车间",
-    },
-    {
-      id: "ac-004",
-      registration: "B-7021U",
-      model: "DJI M300 RTK",
-      fleetId: "fleet-002",
-      fleetName: "物流机队B",
-      status: "SERVICEABLE" as const,
-      totalFlightHours: 234.1,
-      totalFlightCycles: 178,
-      lastFlightDate: "2026-01-15",
-      location: "基地停机坪",
-    },
-    {
-      id: "ac-005",
-      registration: "B-7022U",
-      model: "DJI M300 RTK",
-      fleetId: "fleet-002",
-      fleetName: "物流机队B",
-      status: "SERVICEABLE" as const,
-      totalFlightHours: 189.5,
-      totalFlightCycles: 145,
-      lastFlightDate: "2026-01-13",
-      location: "配送途中",
-    },
-    {
-      id: "ac-006",
-      registration: "B-7023U",
-      model: "DJI M300 RTK",
-      fleetId: "fleet-002",
-      fleetName: "物流机队B",
-      status: "GROUNDED" as const,
-      totalFlightHours: 312.7,
-      totalFlightCycles: 234,
-      lastFlightDate: "2026-01-08",
-      location: "停飞区",
-    },
-    {
-      id: "ac-007",
-      registration: "B-7031U",
-      model: "DJI Mavic 3 Enterprise",
-      fleetId: "fleet-003",
-      fleetName: "测绘机队C",
-      status: "SERVICEABLE" as const,
-      totalFlightHours: 45.3,
-      totalFlightCycles: 38,
-      lastFlightDate: "2026-01-15",
-      location: "基地停机坪",
-    },
-    {
-      id: "ac-008",
-      registration: "B-7032U",
-      model: "DJI Mavic 3 Enterprise",
-      fleetId: "fleet-003",
-      fleetName: "测绘机队C",
-      status: "MAINTENANCE" as const,
-      totalFlightHours: 67.8,
-      totalFlightCycles: 54,
-      lastFlightDate: "2026-01-12",
-      location: "维修车间",
-    },
-  ];
+  // Create a map of fleet IDs to fleet names
+  const fleetMap = useMemo(() => {
+    const map = new Map<string, string>();
+    fleets.forEach(f => map.set(f.id, f.name));
+    return map;
+  }, [fleets]);
 
   // Filter aircraft
-  const filteredAircraft = aircraft.filter((ac) => {
-    const matchesSearch =
-      ac.registration.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ac.model.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredAircraft = useMemo(() => {
+    return aircraft.filter((ac) => {
+      const matchesSearch =
+        ac.registrationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ac.model.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesStatus = statusFilter === "all" || ac.status === statusFilter;
-    const matchesFleet = fleetFilter === "all" || ac.fleetId === fleetFilter;
+      const matchesStatus = statusFilter === "all" || ac.status === statusFilter;
+      const matchesFleet = fleetFilter === "all" || ac.fleetId === fleetFilter;
 
-    return matchesSearch && matchesStatus && matchesFleet;
-  });
+      return matchesSearch && matchesStatus && matchesFleet;
+    });
+  }, [aircraft, searchQuery, statusFilter, fleetFilter]);
 
   // Status counts
-  const statusCounts = aircraft.reduce(
-    (acc, ac) => {
-      acc[ac.status] = (acc[ac.status] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
+  const statusCounts = useMemo(() => {
+    return aircraft.reduce(
+      (acc, ac) => {
+        acc[ac.status] = (acc[ac.status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+  }, [aircraft]);
+
+  const handleDelete = async () => {
+    if (!deleteAircraftId) return;
+    setIsDeleting(true);
+    try {
+      await api.delete(`/aircraft/${deleteAircraftId}`);
+      setAircraft(aircraft.filter(a => a.id !== deleteAircraftId));
+      setDeleteAircraftId(null);
+    } catch (error) {
+      console.error("Failed to delete aircraft:", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -184,28 +159,28 @@ export function AircraftListPage() {
           全部 ({aircraft.length})
         </Button>
         <Button
-          variant={statusFilter === "SERVICEABLE" ? "default" : "outline"}
+          variant={statusFilter === "AVAILABLE" ? "default" : "outline"}
           size="sm"
-          onClick={() => setStatusFilter("SERVICEABLE")}
-          className="data-[variant=default]:bg-serviceable data-[variant=default]:text-serviceable-foreground"
+          onClick={() => setStatusFilter("AVAILABLE")}
+          className="data-[variant=default]:bg-green-600"
         >
-          可用 ({statusCounts.SERVICEABLE || 0})
+          可用 ({statusCounts.AVAILABLE || 0})
         </Button>
         <Button
-          variant={statusFilter === "MAINTENANCE" ? "default" : "outline"}
+          variant={statusFilter === "IN_MAINTENANCE" ? "default" : "outline"}
           size="sm"
-          onClick={() => setStatusFilter("MAINTENANCE")}
-          className="data-[variant=default]:bg-maintenance data-[variant=default]:text-maintenance-foreground"
+          onClick={() => setStatusFilter("IN_MAINTENANCE")}
+          className="data-[variant=default]:bg-amber-600"
         >
-          维护中 ({statusCounts.MAINTENANCE || 0})
+          维护中 ({statusCounts.IN_MAINTENANCE || 0})
         </Button>
         <Button
-          variant={statusFilter === "GROUNDED" ? "default" : "outline"}
+          variant={statusFilter === "AOG" ? "default" : "outline"}
           size="sm"
-          onClick={() => setStatusFilter("GROUNDED")}
-          className="data-[variant=default]:bg-grounded data-[variant=default]:text-grounded-foreground"
+          onClick={() => setStatusFilter("AOG")}
+          className="data-[variant=default]:bg-red-600"
         >
-          停飞 ({statusCounts.GROUNDED || 0})
+          停飞 ({statusCounts.AOG || 0})
         </Button>
       </div>
 
@@ -247,82 +222,97 @@ export function AircraftListPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                    注册号
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                    型号
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                    机队
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                    状态
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                    飞行小时
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                    起降循环
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                    当前位置
-                  </th>
-                  <th className="text-right py-3 px-4 font-medium text-sm text-muted-foreground">
-                    操作
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredAircraft.map((ac) => (
-                  <tr key={ac.id} className="border-b hover:bg-muted/50">
-                    <td className="py-3 px-4">
-                      <Link
-                        to={`/aircraft/${ac.id}`}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {ac.registration}
-                      </Link>
-                    </td>
-                    <td className="py-3 px-4 text-sm">{ac.model}</td>
-                    <td className="py-3 px-4 text-sm text-muted-foreground">
-                      {ac.fleetName}
-                    </td>
-                    <td className="py-3 px-4">
-                      <AircraftStatusBadge status={ac.status} />
-                    </td>
-                    <td className="py-3 px-4 text-sm">{ac.totalFlightHours}h</td>
-                    <td className="py-3 px-4 text-sm">{ac.totalFlightCycles}</td>
-                    <td className="py-3 px-4 text-sm text-muted-foreground">
-                      {ac.location}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" asChild>
-                          <Link to={`/aircraft/${ac.id}`}>
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Link>
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => navigate(`/aircraft/${ac.id}/edit`)}>
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-destructive">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
+          {isLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                      注册号
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                      型号
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                      机队
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                      状态
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                      飞行小时
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                      起降循环
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                      适航状态
+                    </th>
+                    <th className="text-right py-3 px-4 font-medium text-sm text-muted-foreground">
+                      操作
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredAircraft.map((ac) => (
+                    <tr key={ac.id} className="border-b hover:bg-muted/50">
+                      <td className="py-3 px-4">
+                        <Link
+                          to={`/aircraft/${ac.id}`}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {ac.registrationNumber}
+                        </Link>
+                      </td>
+                      <td className="py-3 px-4 text-sm">{ac.model}</td>
+                      <td className="py-3 px-4 text-sm text-muted-foreground">
+                        {fleetMap.get(ac.fleetId) || "-"}
+                      </td>
+                      <td className="py-3 px-4">
+                        <AircraftStatusBadge status={STATUS_MAP[ac.status]} />
+                      </td>
+                      <td className="py-3 px-4 text-sm">{ac.totalFlightHours}h</td>
+                      <td className="py-3 px-4 text-sm">{ac.totalFlightCycles}</td>
+                      <td className="py-3 px-4 text-sm">
+                        <span className={ac.isAirworthy ? "text-green-600" : "text-red-600"}>
+                          {ac.isAirworthy ? "适航" : "不适航"}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="icon" asChild>
+                            <Link to={`/aircraft/${ac.id}`}>
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Link>
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => navigate(`/aircraft/${ac.id}/edit`)}>
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive"
+                            onClick={() => setDeleteAircraftId(ac.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Empty State */}
-          {filteredAircraft.length === 0 && (
+          {!isLoading && filteredAircraft.length === 0 && (
             <div className="text-center py-12">
               <Plane className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
               <h3 className="text-lg font-semibold mb-2">未找到飞机</h3>
@@ -341,6 +331,29 @@ export function AircraftListPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteAircraftId} onOpenChange={() => setDeleteAircraftId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除飞机？</AlertDialogTitle>
+            <AlertDialogDescription>
+              此操作无法撤销。删除飞机后，相关的飞行记录和维保记录将被保留但失去关联。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
