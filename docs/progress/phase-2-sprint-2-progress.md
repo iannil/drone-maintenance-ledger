@@ -71,12 +71,34 @@
 | 文件 | 变更 |
 |------|------|
 | `apps/web/src/pages/aircraft-list-page.tsx` | 使用 fullAircraftService 和 fleetService 加载真实数据 |
+| `apps/web/src/pages/aircraft-detail-page.tsx` | 使用 fullAircraftService、fleetService、componentService 加载真实数据 |
 
 功能：
 - 飞机列表从 API 加载
+- 飞机详情页从 API 加载
+- 飞机详情页显示装机零部件列表
 - 状态筛选（可用、维护中、停飞）
 - 机队筛选
 - 搜索功能
+- 删除确认对话框
+- 加载状态骨架屏
+
+### 2.6 零部件管理页面对接 ✅
+
+**新增前端服务**: `apps/web/src/services/component.service.ts`
+
+| 文件 | 变更 |
+|------|------|
+| `apps/web/src/pages/component-list-page.tsx` | 使用 componentService 加载真实数据 |
+| `apps/web/src/pages/component-detail-page.tsx` | 使用 componentService 加载真实数据 |
+
+功能：
+- 零部件列表从 API 加载
+- 零部件详情页从 API 加载
+- 状态筛选（全新、使用中、维修中、已报废）
+- 类型筛选（电机、桨叶、电池等）
+- 搜索功能（序列号、料号、型号、制造商）
+- 显示寿命限制信息
 - 删除确认对话框
 - 加载状态骨架屏
 
@@ -91,6 +113,7 @@
 | `apps/api/src/modules/stats/stats.module.ts` | 统计模块 |
 | `apps/web/src/services/stats.service.ts` | 前端统计服务 |
 | `apps/web/src/services/fleet.service.ts` | 前端机队服务 |
+| `apps/web/src/services/component.service.ts` | 前端零部件服务 |
 | `apps/web/src/components/ui/toast.tsx` | Toast 通知组件 |
 | `apps/web/src/components/ui/alert-dialog.tsx` | 确认对话框组件 |
 
@@ -107,6 +130,9 @@
 | `apps/web/src/pages/fleet-list-page.tsx` | API 对接 |
 | `apps/web/src/pages/fleet-detail-page.tsx` | API 对接 |
 | `apps/web/src/pages/aircraft-list-page.tsx` | API 对接 |
+| `apps/web/src/pages/aircraft-detail-page.tsx` | API 对接 |
+| `apps/web/src/pages/component-list-page.tsx` | API 对接 |
+| `apps/web/src/pages/component-detail-page.tsx` | API 对接 |
 
 ---
 
@@ -148,7 +174,7 @@
 
 ## 下一步工作
 
-1. **零部件管理页面对接** - 待完成
+1. ~~**零部件管理页面对接**~~ - ✅ 已完成
 2. **飞行记录页面对接** - 待完成
 3. **工单管理页面对接** - 待完成
 4. **修复预存在的 TypeScript 错误**
@@ -178,4 +204,8 @@ npx vite build
 | DELETE /api/fleets/:id | ✅ 已对接 |
 | GET /api/aircraft | ✅ 已对接 |
 | GET /api/aircraft/status/counts | ✅ 已对接 |
+| GET /api/aircraft/:id | ✅ 已对接 |
 | DELETE /api/aircraft/:id | ✅ 已对接 |
+| GET /api/components | ✅ 已对接 |
+| GET /api/components/:id | ✅ 已对接 |
+| DELETE /api/components/:id | ✅ 已对接 |

@@ -1,4 +1,5 @@
-import { useParams, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Edit2,
@@ -6,13 +7,9 @@ import {
   Clock,
   History,
   Wrench,
-  FileText,
   QrCode,
-  Calendar,
-  MapPin,
   Activity,
-  User,
-  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import {
@@ -23,46 +20,51 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
+import { Skeleton } from "../components/ui/skeleton";
 import { ComponentStatusBadge } from "../components/common/status-badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
+import {
+  componentService,
+  Component,
+  ComponentType,
+  COMPONENT_TYPE_LABELS,
+  COMPONENT_STATUS_LABELS,
+  STATUS_DISPLAY_MAP,
+} from "../services/component.service";
 
 /**
  * Component detail page with comprehensive history tracking
  */
 export function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [component, setComponent] = useState<Component | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - TODO: Replace with API call
-  const component = {
-    id: "comp-001",
-    name: "电机 #1",
-    serialNumber: "SN-M001",
-    type: "MOTOR",
-    manufacturer: "DJI",
-    model: "M350 Motor",
-    partNumber: "M350-MOTOR-001",
-    productionDate: "2024-01-15",
-    status: "INSTALLED" as const,
-    currentAircraftId: "ac-001",
-    currentAircraftReg: "B-7011U",
-    location: "左前",
-    installDate: "2024-03-20",
-    totalFlightHours: 125.5,
-    totalFlightCycles: 89,
-    batteryCycles: null,
-    notes: "运行正常，定期检查无异常",
-    specifications: {
-      maxPower: "500W",
-      ratedVoltage: "24V",
-      maxRpm: "8000",
-      weight: "180g",
-    },
-  };
+  // Load component data
+  useEffect(() => {
+    async function loadComponent() {
+      if (!id) return;
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await componentService.getById(id);
+        setComponent(data);
+      } catch (err) {
+        console.error("Failed to load component:", err);
+        setError("无法加载零部件信息");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadComponent();
+  }, [id]);
 
-  // Installation history (履历解耦核心)
+  // Mock installation history - TODO: Add API endpoint for installation history
   const installationHistory = [
     {
-      id: "inst-003",
+      id: "inst-001",
       action: "INSTALL",
       aircraftId: "ac-001",
       aircraftReg: "B-7011U",
@@ -72,62 +74,24 @@ export function ComponentDetailPage() {
       technician: "李四",
       reason: "新机装机",
     },
-    {
-      id: "inst-002",
-      action: "REMOVE",
-      aircraftId: "ac-002",
-      aircraftReg: "B-7012U",
-      location: "右前",
-      date: "2024-03-19",
-      flightHoursAtRemove: 0,
-      technician: "王五",
-      reason: "测试完成，拆下",
-    },
-    {
-      id: "inst-001",
-      action: "INSTALL",
-      aircraftId: "ac-002",
-      aircraftReg: "B-7012U",
-      location: "右前",
-      date: "2024-03-18",
-      flightHoursAtInstall: 0,
-      technician: "李四",
-      reason: "测试装机",
-    },
   ];
 
-  // Maintenance history
+  // Mock maintenance history - TODO: Add API endpoint for maintenance history
   const maintenanceHistory = [
     {
-      id: "maint-003",
+      id: "maint-001",
       date: "2026-01-10",
       type: "定期检查",
       description: "100小时检查：轴承润滑，螺丝紧固",
       result: "正常",
       technician: "张三",
     },
-    {
-      id: "maint-002",
-      date: "2025-10-15",
-      type: "定期检查",
-      description: "50小时检查：绝缘测试，震动测试",
-      result: "正常",
-      technician: "李四",
-    },
-    {
-      id: "maint-001",
-      date: "2025-07-20",
-      type: "清洁保养",
-      description: "清洁散热片，检查线缆连接",
-      result: "正常",
-      technician: "王五",
-    },
   ];
 
-  // Flight logs involving this component
+  // Mock flight logs - TODO: Add API endpoint for flight logs
   const recentFlights = [
     {
-      id: "flight-003",
+      id: "flight-001",
       date: "2026-01-15",
       aircraftReg: "B-7011U",
       pilot: "张三",
@@ -135,25 +99,61 @@ export function ComponentDetailPage() {
       flightHours: 1.42,
       purpose: "电力巡检",
     },
-    {
-      id: "flight-002",
-      date: "2026-01-14",
-      aircraftReg: "B-7011U",
-      pilot: "李四",
-      duration: "2h 10m",
-      flightHours: 2.17,
-      purpose: "线路巡视",
-    },
-    {
-      id: "flight-001",
-      date: "2026-01-13",
-      aircraftReg: "B-7011U",
-      pilot: "张三",
-      duration: "0h 45m",
-      flightHours: 0.75,
-      purpose: "设备测试",
-    },
   ];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  if (error || !component) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link to="/components">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold text-slate-900">零部件详情</h1>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Package className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <h3 className="text-lg font-semibold mb-2">{error || "未找到零部件"}</h3>
+            <p className="text-muted-foreground mb-4">
+              请检查链接是否正确或返回列表页面
+            </p>
+            <Button onClick={() => navigate("/components")}>
+              返回列表
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const formatDate = (timestamp: number | null) => {
+    if (!timestamp) return "-";
+    return new Date(timestamp).toLocaleDateString("zh-CN");
+  };
 
   return (
     <div className="space-y-6">
@@ -166,17 +166,25 @@ export function ComponentDetailPage() {
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-900">{component.name}</h1>
-            <ComponentStatusBadge status={component.status} />
+            <h1 className="text-2xl font-bold text-slate-900 font-mono">
+              {component.serialNumber}
+            </h1>
+            <ComponentStatusBadge
+              status={STATUS_DISPLAY_MAP[component.status]}
+              label={COMPONENT_STATUS_LABELS[component.status]}
+            />
+            {!component.isAirworthy && (
+              <Badge variant="destructive">不适航</Badge>
+            )}
           </div>
           <p className="text-muted-foreground">
-            {component.manufacturer} {component.model}
+            {component.manufacturer} {component.model || ""}
           </p>
         </div>
         <Button variant="outline" size="icon" title="查看二维码">
           <QrCode className="w-4 h-4" />
         </Button>
-        <Button variant="outline">
+        <Button variant="outline" onClick={() => navigate(`/components/${id}/edit`)}>
           <Edit2 className="w-4 h-4 mr-2" />
           编辑
         </Button>
@@ -206,17 +214,19 @@ export function ComponentDetailPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <MapPin className="w-5 h-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-bold">{component.currentAircraftReg}</p>
-                <p className="text-xs text-muted-foreground">{component.location}</p>
+        {component.type === "BATTERY" && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <Activity className="w-5 h-5 text-muted-foreground" />
+                <div>
+                  <p className="text-2xl font-bold">{component.batteryCycles}</p>
+                  <p className="text-xs text-muted-foreground">电池循环</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
@@ -249,20 +259,18 @@ export function ComponentDetailPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">名称</span>
-                  <span className="font-medium">{component.name}</span>
-                </div>
-                <div className="flex justify-between">
                   <span className="text-muted-foreground">序列号</span>
                   <span className="font-medium font-mono">{component.serialNumber}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">零件号</span>
-                  <span className="font-medium">{component.partNumber}</span>
+                  <span className="text-muted-foreground">料号</span>
+                  <span className="font-medium font-mono">{component.partNumber}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">类型</span>
-                  <span className="font-medium">{component.type}</span>
+                  <span className="font-medium">
+                    {COMPONENT_TYPE_LABELS[component.type as ComponentType]}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">制造商</span>
@@ -270,50 +278,80 @@ export function ComponentDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">型号</span>
-                  <span className="font-medium">{component.model}</span>
+                  <span className="font-medium">{component.model || "-"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">生产日期</span>
-                  <span className="font-medium">{component.productionDate}</span>
+                  <span className="font-medium">{formatDate(component.manufacturedAt)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">采购日期</span>
+                  <span className="font-medium">{formatDate(component.purchasedAt)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">当前状态</span>
-                  <ComponentStatusBadge status={component.status} />
+                  <ComponentStatusBadge
+                    status={STATUS_DISPLAY_MAP[component.status]}
+                    label={COMPONENT_STATUS_LABELS[component.status]}
+                  />
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">适航状态</span>
+                  <span className={component.isAirworthy ? "text-green-600" : "text-red-600"}>
+                    {component.isAirworthy ? "适航" : "不适航"}
+                  </span>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Current Installation */}
+            {/* Life Limited Parts Info */}
             <Card>
               <CardHeader>
-                <CardTitle>当前装机</CardTitle>
+                <CardTitle>寿命限制信息</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">飞机注册号</span>
-                  <Link
-                    to={`/aircraft/${component.currentAircraftId}`}
-                    className="font-medium text-primary hover:underline"
-                  >
-                    {component.currentAircraftReg}
-                  </Link>
+                  <span className="text-muted-foreground">是否寿命件</span>
+                  <span className="font-medium">
+                    {component.isLifeLimited ? "是" : "否"}
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">安装位置</span>
-                  <span className="font-medium">{component.location}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">装机日期</span>
-                  <span className="font-medium">{component.installDate}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">本次飞行小时</span>
-                  <span className="font-medium">{component.totalFlightHours}h</span>
-                </div>
+                {component.isLifeLimited && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">最大飞行小时</span>
+                      <span className="font-medium">
+                        {component.maxFlightHours ? `${component.maxFlightHours}h` : "-"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">剩余小时</span>
+                      <span className="font-medium">
+                        {component.maxFlightHours
+                          ? `${Math.max(0, component.maxFlightHours - component.totalFlightHours)}h`
+                          : "-"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">最大循环次数</span>
+                      <span className="font-medium">
+                        {component.maxCycles || "-"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">剩余循环</span>
+                      <span className="font-medium">
+                        {component.maxCycles
+                          ? Math.max(0, component.maxCycles - component.totalFlightCycles)
+                          : "-"}
+                      </span>
+                    </div>
+                  </>
+                )}
                 <div className="pt-4 border-t flex gap-2">
                   <Button variant="outline" size="sm">
                     <Package className="w-4 h-4 mr-2" />
-                    拆下
+                    装机/拆下
                   </Button>
                   <Button variant="outline" size="sm">
                     <Wrench className="w-4 h-4 mr-2" />
@@ -324,33 +362,14 @@ export function ComponentDetailPage() {
             </Card>
           </div>
 
-          {/* Specifications */}
-          <Card>
-            <CardHeader>
-              <CardTitle>技术规格</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {Object.entries(component.specifications).map(([key, value]) => (
-                  <div key={key} className="text-center p-3 rounded-lg bg-muted/50">
-                    <p className="text-xs text-muted-foreground uppercase">
-                      {key.replace(/([A-Z])/g, " $1").trim()}
-                    </p>
-                    <p className="font-medium">{value}</p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Notes */}
-          {component.notes && (
+          {/* Description */}
+          {component.description && (
             <Card>
               <CardHeader>
-                <CardTitle>备注</CardTitle>
+                <CardTitle>描述</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm">{component.notes}</p>
+                <p className="text-sm">{component.description}</p>
               </CardContent>
             </Card>
           )}
@@ -432,13 +451,19 @@ export function ComponentDetailPage() {
                               <span className="text-muted-foreground">
                                 {record.action === "INSTALL" ? "装机时" : "拆下时"}小时:{" "}
                               </span>
-                              <span className="font-medium">{record.flightHoursAtInstall || record.flightHoursAtRemove}h</span>
+                              <span className="font-medium">{record.flightHoursAtInstall}h</span>
                             </div>
                           </div>
                         </CardContent>
                       </Card>
                     </div>
                   ))}
+
+                  {installationHistory.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      暂无装机记录
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -489,6 +514,12 @@ export function ComponentDetailPage() {
                     </div>
                   </div>
                 ))}
+
+                {maintenanceHistory.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    暂无维保记录
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -533,6 +564,12 @@ export function ComponentDetailPage() {
                     </div>
                   </div>
                 ))}
+
+                {recentFlights.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    暂无飞行记录
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

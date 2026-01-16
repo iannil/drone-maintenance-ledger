@@ -1,4 +1,5 @@
-import { useParams, Link } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Edit2,
@@ -8,9 +9,8 @@ import {
   FileText,
   Wrench,
   History,
-  MoreHorizontal,
-  User,
   Calendar,
+  Plane,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import {
@@ -21,106 +21,86 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
+import { Skeleton } from "../components/ui/skeleton";
 import { AircraftStatusBadge } from "../components/common/status-badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
+import {
+  fullAircraftService,
+  fleetService,
+  Aircraft,
+  AircraftStatus,
+  Fleet,
+} from "../services/fleet.service";
+import {
+  componentService,
+  Component,
+  ComponentType,
+  COMPONENT_TYPE_LABELS,
+  COMPONENT_STATUS_LABELS,
+  STATUS_DISPLAY_MAP,
+} from "../services/component.service";
+import { ComponentStatusBadge } from "../components/common/status-badge";
+
+/**
+ * Map backend status to frontend status badge
+ */
+const STATUS_MAP: Record<AircraftStatus, "SERVICEABLE" | "MAINTENANCE" | "GROUNDED" | "RETIRED"> = {
+  AVAILABLE: "SERVICEABLE",
+  IN_MAINTENANCE: "MAINTENANCE",
+  AOG: "GROUNDED",
+  RETIRED: "RETIRED",
+};
 
 /**
  * Aircraft detail page with comprehensive information
  */
 export function AircraftDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [aircraft, setAircraft] = useState<Aircraft | null>(null);
+  const [fleet, setFleet] = useState<Fleet | null>(null);
+  const [components, setComponents] = useState<Component[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - TODO: Replace with API call
-  const aircraft = {
-    id: "ac-001",
-    registration: "B-7011U",
-    model: "DJI M350 RTK",
-    serialNumber: "SN-M350-2024-001",
-    manufacturer: "DJI",
-    productionDate: "2024-03-15",
-    fleetId: "fleet-001",
-    fleetName: "巡检机队A",
-    status: "SERVICEABLE" as const,
-    totalFlightHours: 125.5,
-    totalFlightCycles: 89,
-    lastFlightDate: "2026-01-15",
-    lastFlightPilot: "张三",
-    location: "基地停机坪",
-    notes: "主要执行电力巡检任务，状态良好",
-  };
+  // Load aircraft data
+  useEffect(() => {
+    async function loadData() {
+      if (!id) return;
+      setIsLoading(true);
+      setError(null);
+      try {
+        const aircraftData = await fullAircraftService.getById(id);
+        setAircraft(aircraftData);
 
-  // Mock components data
-  const components = [
-    {
-      id: "comp-001",
-      name: "电机 #1",
-      serialNumber: "SN-M001",
-      type: "MOTOR",
-      status: "INSTALLED" as const,
-      location: "左前",
-      installDate: "2024-03-20",
-      totalFlightHours: 125.5,
-      dueMaintenance: "50h 后",
-    },
-    {
-      id: "comp-002",
-      name: "电机 #2",
-      serialNumber: "SN-M002",
-      type: "MOTOR",
-      status: "INSTALLED" as const,
-      location: "右前",
-      installDate: "2024-03-20",
-      totalFlightHours: 125.5,
-      dueMaintenance: "50h 后",
-    },
-    {
-      id: "comp-003",
-      name: "电机 #3",
-      serialNumber: "SN-M003",
-      type: "MOTOR",
-      status: "INSTALLED" as const,
-      location: "左后",
-      installDate: "2024-05-10",
-      totalFlightHours: 85.2,
-      dueMaintenance: "正常",
-    },
-    {
-      id: "comp-004",
-      name: "电机 #4",
-      serialNumber: "SN-M004",
-      type: "MOTOR",
-      status: "INSTALLED" as const,
-      location: "右后",
-      installDate: "2024-05-10",
-      totalFlightHours: 85.2,
-      dueMaintenance: "正常",
-    },
-    {
-      id: "comp-005",
-      name: "主控模块",
-      serialNumber: "SN-FC-001",
-      type: "FLIGHT_CONTROLLER",
-      status: "INSTALLED" as const,
-      location: "机身内部",
-      installDate: "2024-03-15",
-      totalFlightHours: 125.5,
-      dueMaintenance: "正常",
-    },
-    {
-      id: "comp-006",
-      name: "电池包 #1",
-      serialNumber: "SN-B001",
-      type: "BATTERY",
-      status: "INSTALLED" as const,
-      location: "电池仓1",
-      installDate: "2025-12-01",
-      totalFlightHours: 45.0,
-      batteryCycles: 28,
-      dueMaintenance: "需更换",
-    },
-  ];
+        // Load fleet info if available
+        if (aircraftData.fleetId) {
+          try {
+            const fleetData = await fleetService.getById(aircraftData.fleetId);
+            setFleet(fleetData);
+          } catch {
+            console.warn("Failed to load fleet info");
+          }
+        }
 
-  // Mock maintenance history
+        // Load installed components
+        try {
+          const componentsData = await componentService.list(undefined, undefined, id);
+          setComponents(componentsData);
+        } catch {
+          console.warn("Failed to load components");
+        }
+      } catch (err) {
+        console.error("Failed to load aircraft:", err);
+        setError("无法加载飞机信息");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, [id]);
+
+  // Mock maintenance history - TODO: Add API endpoint
   const maintenanceHistory = [
     {
       id: "maint-001",
@@ -130,25 +110,9 @@ export function AircraftDetailPage() {
       technician: "李四",
       status: "completed",
     },
-    {
-      id: "maint-002",
-      date: "2025-12-15",
-      type: "部件更换",
-      description: "更换桨叶组 (SN-P002)",
-      technician: "王五",
-      status: "completed",
-    },
-    {
-      id: "maint-003",
-      date: "2025-11-01",
-      type: "定期检查",
-      description: "50小时定期检查",
-      technician: "李四",
-      status: "completed",
-    },
   ];
 
-  // Mock flight logs
+  // Mock flight logs - TODO: Add API endpoint
   const recentFlights = [
     {
       id: "flight-001",
@@ -160,27 +124,61 @@ export function AircraftDetailPage() {
       landingLocation: "基地",
       purpose: "电力巡检",
     },
-    {
-      id: "flight-002",
-      date: "2026-01-14",
-      pilot: "李四",
-      duration: "2h 10m",
-      flightHours: 2.17,
-      takeoffLocation: "基地",
-      landingLocation: "基地",
-      purpose: "线路巡视",
-    },
-    {
-      id: "flight-003",
-      date: "2026-01-13",
-      pilot: "张三",
-      duration: "0h 45m",
-      flightHours: 0.75,
-      takeoffLocation: "巡检点A",
-      landingLocation: "基地",
-      purpose: "设备测试",
-    },
   ];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  if (error || !aircraft) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link to="/aircraft">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold text-slate-900">飞机详情</h1>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Plane className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <h3 className="text-lg font-semibold mb-2">{error || "未找到飞机"}</h3>
+            <p className="text-muted-foreground mb-4">
+              请检查链接是否正确或返回列表页面
+            </p>
+            <Button onClick={() => navigate("/aircraft")}>
+              返回列表
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const formatDate = (timestamp: number | null) => {
+    if (!timestamp) return "-";
+    return new Date(timestamp).toLocaleDateString("zh-CN");
+  };
 
   return (
     <div className="space-y-6">
@@ -193,12 +191,15 @@ export function AircraftDetailPage() {
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-900">{aircraft.registration}</h1>
-            <AircraftStatusBadge status={aircraft.status} />
+            <h1 className="text-2xl font-bold text-slate-900">{aircraft.registrationNumber}</h1>
+            <AircraftStatusBadge status={STATUS_MAP[aircraft.status]} />
+            {!aircraft.isAirworthy && (
+              <Badge variant="destructive">不适航</Badge>
+            )}
           </div>
           <p className="text-muted-foreground">{aircraft.model}</p>
         </div>
-        <Button variant="outline">
+        <Button variant="outline" onClick={() => navigate(`/aircraft/${id}/edit`)}>
           <Edit2 className="w-4 h-4 mr-2" />
           编辑
         </Button>
@@ -233,8 +234,8 @@ export function AircraftDetailPage() {
             <div className="flex items-center gap-3">
               <Calendar className="w-5 h-5 text-muted-foreground" />
               <div>
-                <p className="text-sm font-bold">{aircraft.lastFlightDate}</p>
-                <p className="text-xs text-muted-foreground">最后飞行</p>
+                <p className="text-sm font-bold">{formatDate(aircraft.lastInspectionAt)}</p>
+                <p className="text-xs text-muted-foreground">上次检查</p>
               </div>
             </div>
           </CardContent>
@@ -245,7 +246,7 @@ export function AircraftDetailPage() {
               <Package className="w-5 h-5 text-muted-foreground" />
               <div>
                 <p className="text-sm font-bold">{components.length}</p>
-                <p className="text-xs text-muted-foreground">装载数量</p>
+                <p className="text-xs text-muted-foreground">装载零部件</p>
               </div>
             </div>
           </CardContent>
@@ -272,7 +273,7 @@ export function AircraftDetailPage() {
               <CardContent className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">注册号</span>
-                  <span className="font-medium">{aircraft.registration}</span>
+                  <span className="font-medium">{aircraft.registrationNumber}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">型号</span>
@@ -280,28 +281,30 @@ export function AircraftDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">序列号</span>
-                  <span className="font-medium">{aircraft.serialNumber}</span>
+                  <span className="font-medium font-mono">{aircraft.serialNumber}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">制造商</span>
                   <span className="font-medium">{aircraft.manufacturer}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">生产日期</span>
-                  <span className="font-medium">{aircraft.productionDate}</span>
-                </div>
-                <div className="flex justify-between">
                   <span className="text-muted-foreground">所属机队</span>
-                  <Link
-                    to={`/fleets/${aircraft.fleetId}`}
-                    className="font-medium text-primary hover:underline"
-                  >
-                    {aircraft.fleetName}
-                  </Link>
+                  {fleet ? (
+                    <Link
+                      to={`/fleets/${aircraft.fleetId}`}
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {fleet.name}
+                    </Link>
+                  ) : (
+                    <span className="font-medium">-</span>
+                  )}
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">当前位置</span>
-                  <span className="font-medium">{aircraft.location}</span>
+                  <span className="text-muted-foreground">适航状态</span>
+                  <span className={aircraft.isAirworthy ? "text-green-600" : "text-red-600"}>
+                    {aircraft.isAirworthy ? "适航" : "不适航"}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -309,16 +312,20 @@ export function AircraftDetailPage() {
             {/* Status & Notes */}
             <Card>
               <CardHeader>
-                <CardTitle>状态与备注</CardTitle>
+                <CardTitle>状态与检查</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">当前状态</p>
-                  <AircraftStatusBadge status={aircraft.status} />
+                  <AircraftStatusBadge status={STATUS_MAP[aircraft.status]} />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">备注</p>
-                  <p className="text-sm">{aircraft.notes}</p>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">上次检查</span>
+                  <span className="font-medium">{formatDate(aircraft.lastInspectionAt)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">下次检查到期</span>
+                  <span className="font-medium">{formatDate(aircraft.nextInspectionDue)}</span>
                 </div>
                 <div className="pt-4 border-t flex gap-2">
                   <Button variant="outline" size="sm">
@@ -333,27 +340,6 @@ export function AircraftDetailPage() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Maintenance Alert */}
-          {components.some((c) => c.dueMaintenance === "需更换" || c.dueMaintenance.includes("后")) && (
-            <Card className="border-amber-200 bg-amber-50">
-              <CardHeader>
-                <CardTitle className="text-amber-800">维保提醒</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {components
-                    .filter((c) => c.dueMaintenance === "需更换" || c.dueMaintenance.includes("后"))
-                    .map((c) => (
-                      <li key={c.id} className="flex items-center justify-between text-sm">
-                        <span>{c.name} ({c.serialNumber})</span>
-                        <Badge variant="secondary">{c.dueMaintenance}</Badge>
-                      </li>
-                    ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
         {/* Components Tab */}
@@ -372,59 +358,60 @@ export function AircraftDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                        名称
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                        序列号
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                        位置
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                        类型
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                        飞行小时
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                        状态
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {components.map((comp) => (
-                      <tr key={comp.id} className="border-b hover:bg-muted/50">
-                        <td className="py-3 px-4">
-                          <Link
-                            to={`/components/${comp.id}`}
-                            className="font-medium text-primary hover:underline"
-                          >
-                            {comp.name}
-                          </Link>
-                        </td>
-                        <td className="py-3 px-4 text-sm">{comp.serialNumber}</td>
-                        <td className="py-3 px-4 text-sm">{comp.location}</td>
-                        <td className="py-3 px-4 text-sm">{comp.type}</td>
-                        <td className="py-3 px-4 text-sm">{comp.totalFlightHours}h</td>
-                        <td className="py-3 px-4">
-                          {comp.dueMaintenance === "需更换" ? (
-                            <Badge variant="destructive">需更换</Badge>
-                          ) : comp.dueMaintenance.includes("后") ? (
-                            <Badge variant="secondary">{comp.dueMaintenance}</Badge>
-                          ) : (
-                            <Badge className="bg-serviceable text-serviceable">正常</Badge>
-                          )}
-                        </td>
+              {components.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                          序列号
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                          料号
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                          类型
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                          飞行小时
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                          状态
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {components.map((comp) => (
+                        <tr key={comp.id} className="border-b hover:bg-muted/50">
+                          <td className="py-3 px-4">
+                            <Link
+                              to={`/components/${comp.id}`}
+                              className="font-medium text-primary hover:underline font-mono"
+                            >
+                              {comp.serialNumber}
+                            </Link>
+                          </td>
+                          <td className="py-3 px-4 text-sm font-mono">{comp.partNumber}</td>
+                          <td className="py-3 px-4 text-sm">
+                            {COMPONENT_TYPE_LABELS[comp.type as ComponentType]}
+                          </td>
+                          <td className="py-3 px-4 text-sm">{comp.totalFlightHours}h</td>
+                          <td className="py-3 px-4">
+                            <ComponentStatusBadge
+                              status={STATUS_DISPLAY_MAP[comp.status]}
+                              label={COMPONENT_STATUS_LABELS[comp.status]}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  暂无装机零部件
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -469,6 +456,12 @@ export function AircraftDetailPage() {
                     </div>
                   </div>
                 ))}
+
+                {recentFlights.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    暂无飞行记录
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -515,6 +508,12 @@ export function AircraftDetailPage() {
                     </div>
                   </div>
                 ))}
+
+                {maintenanceHistory.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    暂无维保记录
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
