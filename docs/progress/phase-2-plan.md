@@ -1,103 +1,76 @@
 # Phase 2 开发计划：系统集成与功能完善
 
 **创建时间**: 2026-01-16
+**更新时间**: 2026-01-17
 **阶段目标**: 完成前后端集成，实现系统可用
+**当前状态**: Sprint 2 已完成，Sprint 3 待开始
 
 ---
 
 ## 阶段概述
 
-Phase 1 已完成前端框架（51 个页面）和核心 API（89 个端点）的开发。Phase 2 的核心目标是**让系统真正可用**——执行数据库迁移、完成前后端对接、补充缺失的 API。
+Phase 1 已完成前端框架（51 个页面）和核心 API（92 个端点）的开发。Phase 2 的核心目标是**让系统真正可用**——执行数据库迁移、完成前后端对接、补充缺失的 API。
 
 ---
 
 ## 任务分解
 
-### Sprint 1: 基础设施就绪（P0）
+### Sprint 1: 基础设施就绪（P0）✅ 已完成
 
 **目标**: 数据库可用，系统可启动
+**完成时间**: 2026-01-16
 
-#### 1.1 数据库迁移执行
-| 任务 | 命令/操作 | 验收标准 |
-|------|-----------|----------|
-| 安装 PostgreSQL | `brew install postgresql@16` 或 Docker | 数据库服务运行中 |
-| 创建数据库 | `CREATE DATABASE drone_ledger` | 数据库存在 |
-| 配置环境变量 | 编辑 `.env` 文件 | `DATABASE_URL` 配置正确 |
-| 推送 Schema | `pnpm --filter @repo/db db:push` | 15 张表创建成功 |
-| 初始化种子数据 | `pnpm --filter @repo/db db:seed` | 测试用户和演示数据存在 |
-| 验证数据库 | `pnpm --filter @repo/db db:studio` | Drizzle Studio 可访问 |
+#### 1.1 数据库迁移执行 ✅
+| 任务 | 命令/操作 | 状态 |
+|------|-----------|------|
+| ~~安装 PostgreSQL~~ | 使用 SQLite 替代 | ✅ 已完成 |
+| 创建数据库 | `database/local.db` | ✅ 已完成 |
+| 配置环境变量 | 编辑 `.env` 文件 | ✅ 已完成 |
+| 推送 Schema | `pnpm --filter @repo/db db:push` | ✅ 已完成 |
+| 初始化种子数据 | `pnpm --filter @repo/db db:seed` | ✅ 已完成 |
+| 验证数据库 | `pnpm --filter @repo/db db:studio` | ✅ 已完成 |
 
-**预计工作量**: 0.5 天
+#### 1.2 后端服务启动验证 ✅
+| 任务 | 状态 |
+|------|------|
+| 安装依赖 | ✅ 已完成 |
+| 启动 API 服务 | ✅ 已完成 |
+| 测试认证 API | ✅ 已完成 |
+| 测试资产 API | ✅ 已完成 |
 
-#### 1.2 后端服务启动验证
-| 任务 | 验收标准 |
-|------|----------|
-| 安装依赖 | `pnpm install` 成功 |
-| 启动 API 服务 | `pnpm --filter api dev` 成功启动 |
-| 测试认证 API | POST `/auth/login` 返回 JWT |
-| 测试资产 API | GET `/fleets` 返回数据 |
-
-**预计工作量**: 0.5 天
+**完成报告**: [phase-2-sprint-1-infrastructure.md](../reports/completed/phase-2-sprint-1-infrastructure.md)
 
 ---
 
-### Sprint 2: 前后端对接（P0）
+### Sprint 2: 前后端对接（P0）✅ 已完成
 
 **目标**: 前端页面使用真实 API 数据
+**完成时间**: 2026-01-17
 
-#### 2.1 API 客户端完善
-| 任务 | 文件 | 说明 |
+**注意**: 存在约 56 个 TypeScript 编译错误，详见 [代码问题清单](../reports/code-issues-2026-01-17.md)
+
+**完成报告**: [phase-2-sprint-2-api-integration.md](../reports/completed/phase-2-sprint-2-api-integration.md)
+
+#### 2.1 API 客户端完善 ✅
+| 任务 | 文件 | 状态 |
 |------|------|------|
-| 配置 API 基础 URL | `apps/web/src/services/api.ts` | 环境变量配置 |
-| 完善请求拦截器 | `apps/web/src/services/api.ts` | JWT Token 自动附加 |
-| 完善响应拦截器 | `apps/web/src/services/api.ts` | 401 自动跳转登录 |
-| 统一错误处理 | `apps/web/src/services/api.ts` | Toast 提示 |
+| 配置 API 基础 URL | `apps/web/src/services/api.ts` | ✅ |
+| 完善请求拦截器 | `apps/web/src/services/api.ts` | ✅ |
+| 完善响应拦截器 | `apps/web/src/services/api.ts` | ✅ |
+| 统一错误处理 | `apps/web/src/services/api.ts` | ✅ |
 
-**预计工作量**: 1 天
+#### 2.2 核心页面 API 对接 ✅
 
-#### 2.2 核心页面 API 对接（按优先级）
-
-##### 第一批：认证与首页
-| 页面 | 对接 API | 工作量 |
-|------|----------|--------|
-| 登录页 | `POST /auth/login` | 0.5 天 |
-| 仪表板 | 统计 API（待开发） | 1 天 |
-
-##### 第二批：资产配置
-| 页面 | 对接 API | 工作量 |
-|------|----------|--------|
-| 机队列表 | `GET /fleets` | 0.5 天 |
-| 机队详情 | `GET /fleets/:id` | 0.5 天 |
-| 飞机列表 | `GET /aircraft` | 0.5 天 |
-| 飞机详情 | `GET /aircraft/:id` | 0.5 天 |
-| 飞机表单 | `POST/PUT /aircraft` | 0.5 天 |
-| 零部件列表 | `GET /components` | 0.5 天 |
-| 零部件详情 | `GET /components/:id` | 0.5 天 |
-| 零部件表单 | `POST/PUT /components` | 0.5 天 |
-
-##### 第三批：飞行记录
-| 页面 | 对接 API | 工作量 |
-|------|----------|--------|
-| 飞行记录列表 | `GET /flight-logs` | 0.5 天 |
-| 飞行记录详情 | `GET /flight-logs/:id` | 0.5 天 |
-| 飞行记录表单 | `POST/PUT /flight-logs` | 0.5 天 |
-| PIREP 列表 | `GET /pilot-reports` | 0.5 天 |
-| PIREP 表单 | `POST /pilot-reports` | 0.5 天 |
-
-##### 第四批：工单管理
-| 页面 | 对接 API | 工作量 |
-|------|----------|--------|
-| 工单列表 | `GET /work-orders` | 0.5 天 |
-| 工单详情 | `GET /work-orders/:id` | 0.5 天 |
-| 工单表单 | `POST/PUT /work-orders` | 0.5 天 |
-| 工单执行 | `POST /work-orders/:id/start` 等 | 1 天 |
-| 工单放行 | `POST /work-orders/:id/release` | 0.5 天 |
-
-**预计总工作量**: 10 天
+| 批次 | 页面 | 状态 |
+|------|------|------|
+| 第一批 | 登录页、仪表板 | ✅ |
+| 第二批 | 机队/飞机/零部件 | ✅ |
+| 第三批 | 飞行记录 | ✅ |
+| 第四批 | 工单管理 | ✅ |
 
 ---
 
-### Sprint 3: 缺失 API 开发（P1）
+### Sprint 3: 缺失 API 开发（P1）⏳ 待开始
 
 **目标**: 补充前端页面所需但尚未实现的 API
 
@@ -196,25 +169,27 @@ Phase 1 已完成前端框架（51 个页面）和核心 API（89 个端点）�
 
 ## 里程碑与验收
 
-### M1: 系统可启动（Sprint 1 完成）
-- [ ] 数据库迁移成功
-- [ ] 种子数据初始化
-- [ ] API 服务启动正常
-- [ ] 可通过 API 登录
+### M1: 系统可启动（Sprint 1 完成）✅ 已达成
+- [x] 数据库迁移成功
+- [x] 种子数据初始化
+- [x] API 服务启动正常
+- [x] 可通过 API 登录
 
-### M2: 核心功能可用（Sprint 2 完成）
-- [ ] 登录页对接真实 API
-- [ ] 资产配置页面数据真实
-- [ ] 飞行记录页面数据真实
-- [ ] 工单页面数据真实
+### M2: 核心功能可用（Sprint 2 完成）✅ 已达成
+- [x] 登录页对接真实 API
+- [x] 资产配置页面数据真实
+- [x] 飞行记录页面数据真实
+- [x] 工单页面数据真实
+- [ ] ⚠️ TypeScript 编译错误待修复（约 56 个）
 
-### M3: 功能完整（Sprint 3-4 完成）
+### M3: 功能完整（Sprint 3-4 完成）⏳ 进行中
 - [ ] 库存管理功能可用
 - [ ] 采购管理功能可用
 - [ ] 仪表板统计数据真实
 - [ ] 维保预警正常工作
 
-### M4: 质量达标（Sprint 5 完成）
+### M4: 质量达标（Sprint 5 完成）⏳ 待开始
+- [ ] TypeScript 编译错误修复
 - [ ] 单元测试覆盖率 > 70%
 - [ ] 集成测试通过
 - [ ] 无 P0 级别 Bug
@@ -224,12 +199,13 @@ Phase 1 已完成前端框架（51 个页面）和核心 API（89 个端点）�
 ## 遗留问题处理
 
 ### 高优先级（本阶段解决）
-| 问题 | 解决方案 | Sprint |
-|------|----------|--------|
-| 数据库迁移未执行 | 执行 db:push | Sprint 1 |
-| 前端使用 Mock 数据 | API 对接 | Sprint 2 |
-| 库存 API 缺失 | 开发库存模块 | Sprint 3 |
-| 统计 API 缺失 | 开发统计模块 | Sprint 3 |
+| 问题 | 解决方案 | 状态 |
+|------|----------|------|
+| 数据库迁移未执行 | 执行 db:push | ✅ 已完成 |
+| 前端使用 Mock 数据 | API 对接 | ✅ 已完成 |
+| **TypeScript 编译错误** | 修复约 56 个错误 | ⚠️ **待修复** |
+| 库存 API 缺失 | 开发库存模块 | ⏳ Sprint 3 |
+| 统计 API 缺失 | 开发统计模块 | ✅ 已完成 |
 
 ### 中优先级（下阶段解决）
 | 问题 | 说明 |
@@ -291,6 +267,6 @@ Phase 1 已完成前端框架（51 个页面）和核心 API（89 个端点）�
 
 ## 下一步行动
 
-1. **立即执行**: Sprint 1 - 数据库迁移
-2. **本周目标**: 完成登录页和首页的 API 对接
-3. **短期目标**: 2 周内完成核心页面对接
+1. **立即执行**: 修复 TypeScript 编译错误（约 56 个）
+2. **本周目标**: 开始 Sprint 3 - 库存管理 API 开发
+3. **短期目标**: 完成所有缺失 API，实现功能完整
