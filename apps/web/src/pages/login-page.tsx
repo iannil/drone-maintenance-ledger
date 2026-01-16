@@ -121,10 +121,13 @@ export function LoginPage() {
 
               {/* Demo Credentials */}
               <div className="w-full p-3 rounded-md bg-muted/50 text-xs text-muted-foreground">
-                <div className="font-medium mb-1">开发环境测试账号：</div>
-                <div className="flex justify-between">
-                  <span>用户名: admin</span>
-                  <span>密码: admin</span>
+                <div className="font-medium mb-2">开发环境测试账号（密码均为 password123）：</div>
+                <div className="grid grid-cols-2 gap-1">
+                  <span>admin - 管理员</span>
+                  <span>manager - 机队经理</span>
+                  <span>pilot - 飞手</span>
+                  <span>mechanic - 维修工</span>
+                  <span>inspector - 检验员</span>
                 </div>
               </div>
             </CardFooter>
