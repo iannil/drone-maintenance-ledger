@@ -132,7 +132,7 @@ export function DashboardLayout() {
                 {authStore.user?.fullName || authStore.user?.username}
               </p>
               <p className="text-xs text-muted-foreground truncate">
-                {authStore.user?.role || "User"}
+                {typeof authStore.user?.role === "string" ? authStore.user.role : "User"}
               </p>
             </div>
           </div>
