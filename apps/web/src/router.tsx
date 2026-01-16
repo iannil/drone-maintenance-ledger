@@ -26,6 +26,11 @@ import { SettingsPage } from "./pages/settings-page";
 import { InventoryPage } from "./pages/inventory-page";
 import { InventoryMovementsPage } from "./pages/inventory-movements-page";
 import { ComponentTransfersPage } from "./pages/component-transfers-page";
+import { UsersPage } from "./pages/users-page";
+import { RolesPage } from "./pages/roles-page";
+import { ComponentRemovalsPage } from "./pages/component-removals-page";
+import { FlightLogSearchPage } from "./pages/flight-log-search-page";
+import { WorkOrderSearchPage } from "./pages/work-order-search-page";
 
 /**
  * Application router configuration
@@ -173,6 +178,29 @@ export const router = createBrowserRouter([
       {
         path: "components/:id/transfers",
         element: <ComponentTransfersPage />,
+      },
+      // System Management
+      {
+        path: "settings/users",
+        element: <UsersPage />,
+      },
+      {
+        path: "settings/roles",
+        element: <RolesPage />,
+      },
+      // Component Removals
+      {
+        path: "components/removals",
+        element: <ComponentRemovalsPage />,
+      },
+      // Advanced Search
+      {
+        path: "flight-logs/search",
+        element: <FlightLogSearchPage />,
+      },
+      {
+        path: "work-orders/search",
+        element: <WorkOrderSearchPage />,
       },
     ],
   },

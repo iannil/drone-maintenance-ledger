@@ -10,6 +10,7 @@ import {
   CheckCircle,
   Pause,
   MoreHorizontal,
+  User,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -237,9 +238,11 @@ export function MaintenanceSchedulePage() {
             管理飞机和零部件的维保计划与触发器
           </p>
         </div>
-        <Button>
-          <Plus className="w-4 h-4 mr-2" />
-          新建计划
+        <Button asChild>
+          <Link to="/maintenance/schedules/new">
+            <Plus className="w-4 h-4 mr-2" />
+            新建计划
+          </Link>
         </Button>
       </div>
 
