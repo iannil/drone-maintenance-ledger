@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, Wings, Edit2, Trash2, MoreHorizontal } from "lucide-react";
+import { Plus, Search, Plane, Edit2, Trash2, MoreHorizontal } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -110,7 +110,7 @@ export function FleetListPage() {
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Wings className="w-6 h-6 text-primary" />
+                    <Plane className="w-6 h-6 text-primary" />
                   </div>
                   <div>
                     <CardTitle className="text-lg">{fleet.name}</CardTitle>
@@ -183,7 +183,7 @@ export function FleetListPage() {
       {filteredFleets.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
-            <Wings className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <Plane className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
             <h3 className="text-lg font-semibold mb-2">未找到机队</h3>
             <p className="text-muted-foreground mb-4">
               {searchQuery ? "尝试调整搜索条件" : "点击上方按钮创建第一个机队"}

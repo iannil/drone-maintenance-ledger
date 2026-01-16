@@ -4,7 +4,7 @@ import { Button } from "../components/ui/button";
 import { Skeleton } from "../components/ui/skeleton";
 import {
   Plane,
-  Wings,
+  Package,
   AlertCircle,
   Wrench,
   TrendingUp,
@@ -229,7 +229,7 @@ export function DashboardPage() {
             </Button>
             <Button variant="outline" className="h-auto flex-col gap-2 py-4" asChild>
               <Link to="/components/install">
-                <Wings className="w-5 h-5" />
+                <Package className="w-5 h-5" />
                 <span>装机/拆下</span>
               </Link>
             </Button>
