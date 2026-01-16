@@ -11,7 +11,7 @@ import {
   Wrench,
   Filter,
   Plus,
-  Today,
+  CalendarDays,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import {
@@ -305,7 +305,7 @@ export function MaintenanceCalendarPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={goToToday}>
-            <Today className="w-4 h-4 mr-2" />
+            <CalendarDays className="w-4 h-4 mr-2" />
             今天
           </Button>
           <Button>
