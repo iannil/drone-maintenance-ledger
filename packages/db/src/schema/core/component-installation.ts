@@ -6,8 +6,8 @@
  */
 
 import { pgTable, text, timestamp, uuid, integer } from "drizzle-orm/pg-core";
-import { component } from "./component.js";
-import { aircraft } from "./aircraft.js";
+import { component } from "./component";
+import { aircraft } from "./aircraft";
 
 /**
  * Component installations table

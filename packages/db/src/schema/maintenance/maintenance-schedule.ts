@@ -5,8 +5,8 @@
  */
 
 import { pgTable, text, timestamp, uuid, boolean, integer } from "drizzle-orm/pg-core";
-import { aircraft } from "../core/aircraft.js";
-import { maintenanceTrigger } from "./maintenance-trigger.js";
+import { aircraft } from "../core/aircraft";
+import { maintenanceTrigger } from "./maintenance-trigger";
 
 /**
  * Maintenance status enum

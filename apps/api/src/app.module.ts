@@ -4,6 +4,8 @@ import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UserModule } from "./modules/user/user.module";
 import { AssetModule } from "./modules/asset/asset.module";
+import { FlightModule } from "./modules/flight/flight.module";
+import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
 
 @Module({
   imports: [
@@ -17,10 +19,10 @@ import { AssetModule } from "./modules/asset/asset.module";
     AuthModule,
     UserModule,
     AssetModule,
+    FlightModule,
+    MaintenanceModule,
 
     // TODO: Add more modules as we build them
-    // FlightModule,
-    // MaintenanceModule,
     // PlanningModule,
     // InventoryModule,
     // DashboardModule,

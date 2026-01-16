@@ -5,7 +5,7 @@
  */
 
 import { pgTable, text, timestamp, uuid, boolean, integer, jsonb } from "drizzle-orm/pg-core";
-import { workOrder } from "./work-order.js";
+import { workOrder } from "./work-order";
 
 /**
  * Task status

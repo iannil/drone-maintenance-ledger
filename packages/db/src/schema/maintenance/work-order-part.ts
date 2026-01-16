@@ -4,9 +4,9 @@
  * Parts consumed during work order execution
  */
 
-import { pgTable, text, timestamp, uuid, integer } from "drizzle-orm/pg-core";
-import { workOrder } from "./work-order.js";
-import { component } from "../core/component.js";
+import { pgTable, text, timestamp, uuid, integer, boolean } from "drizzle-orm/pg-core";
+import { workOrder } from "./work-order";
+import { component } from "../core/component";
 
 /**
  * Work order parts table

@@ -2,7 +2,7 @@
 
 **更新时间**: 2026-01-16
 **当前版本**: 0.1.0
-**项目状态**: Phase 0-1 已完成，Phase 1 规划与前端开发进行中
+**项目状态**: Phase 1 进行中 - API 开发已完成，待迁移执行
 
 ---
 
@@ -22,8 +22,8 @@ DroneMaintenance-Ledger 是一个面向无人机和 eVTOL 飞行器的开源 MRO
 |------|------|------|
 | 1. 资产配置中心 | 机队档案、BOM树状结构、零部件全生命周期追踪 | ✅ Phase 0-1 已完成 |
 | 2. 计划与工程中心 | 维修大纲定义、多维度触发器、预测性预警 | 🔄 数据模型已完成，API 待实现 |
-| 3. 飞行与技术记录本 | 电子飞行记录、故障报告(PIREP)、适航放行 | 🔄 数据模型已完成，API 待实现 |
-| 4. 维修执行中心 | 工单管理、数字化工卡、带 RII 的检查单 | 🔄 数据模型已完成，API 待实现 |
+| 3. 飞行与技术记录本 | 电子飞行记录、故障报告(PIREP)、适航放行 | ✅ API 已完成 |
+| 4. 维修执行中心 | 工单管理、数字化工卡、带 RII 的检查单 | ✅ API 已完成 |
 | 5. 库存与供应链 | 多仓库库存管理、库存预警、零件适用性校验 | ⏳ 待规划 |
 | 6. 数据看板与报表 | 机队状态、适航履历、可靠性分析 | ⏳ 待规划 |
 
@@ -104,10 +104,74 @@ DroneMaintenance-Ledger 是一个面向无人机和 eVTOL 飞行器的开源 MRO
 - POST /components - 创建零部件
 - PUT /components/:id - 更新零部件
 - DELETE /components/:id - 删除零部件
-- POST /components/install - 安装零部件（框架已创建）
-- POST /components/remove - 拆下零部件（框架已创建）
+- POST /components/install - 安装零部件（含完整业务逻辑）
+- POST /components/remove - 拆下零部件（含完整业务逻辑）
+- GET /components/:id/installations - 获取安装历史
 
-### 5. 前端基础
+### 5. 飞行与技术记录本 API
+
+#### 飞行记录管理 (/flight-logs) - 9个端点
+- GET /flight-logs/:id - 获取飞行记录详情
+- GET /flight-logs - 列出飞行记录（支持按飞机/飞行员筛选）
+- POST /flight-logs - 创建飞行记录（自动更新飞机和组件指标）
+- PUT /flight-logs/:id - 更新飞行记录
+- DELETE /flight-logs/:id - 删除飞行记录（软删除）
+- GET /flight-logs/aircraft/:aircraftId - 获取飞机飞行历史
+- GET /flight-logs/pilot/:pilotId - 获取飞行员飞行记录
+- GET /flight-logs/stats/daily - 获取每日飞行统计
+
+#### 飞行员报告管理 (/pilot-reports) - 9个端点
+- GET /pilot-reports/:id - 获取飞行员报告详情
+- GET /pilot-reports - 列出飞行员报告（支持多种筛选）
+- POST /pilot-reports - 创建飞行员报告
+- PUT /pilot-reports/:id - 更新飞行员报告
+- PUT /pilot-reports/:id/status - 更新报告状态
+- PUT /pilot-reports/:id/resolve - 解决报告
+- DELETE /pilot-reports/:id - 删除报告（软删除）
+- GET /pilot-reports/aog - 获取所有 AOG 报告
+- POST /pilot-reports/:id/work-order - 从报告创建工单
+
+#### 放行记录管理 (/release-records) - 8个端点
+- GET /release-records/:id - 获取放行记录详情
+- GET /release-records - 列出放行记录
+- GET /release-records/aircraft/:aircraftId - 获取飞机放行历史
+- GET /release-records/current/:aircraftId - 获取当前有效放行
+- POST /release-records - 创建放行记录（仅检验员可用）
+- PUT /release-records/:id/sign - 签署放行记录（签署后不可修改）
+- DELETE /release-records/:id - 删除放行记录（软删除）
+- GET /release-records/work-order/:workOrderId - 按工单查询放行记录
+
+### 6. 维修执行中心 API
+
+#### 工单管理 (/work-orders) - 17个端点
+- GET /work-orders/:id - 获取工单详情
+- GET /work-orders - 列出工单（支持按状态/飞机/负责人筛选）
+- POST /work-orders - 创建工单
+- PUT /work-orders/:id - 更新工单
+- PUT /work-orders/:id/status - 更新工单状态
+- PUT /work-orders/:id/assign - 分配工单
+- POST /work-orders/:id/start - 开始执行工单
+- POST /work-orders/:id/complete - 完成工单（需 RII 验证）
+- POST /work-orders/:id/release - 放行工单（仅检验员）
+- POST /work-orders/:id/cancel - 取消工单
+- DELETE /work-orders/:id - 删除工单
+
+#### 工单任务管理 (/work-orders/:id/tasks) - 7个端点
+- GET /work-orders/:id/tasks - 获取工单任务列表
+- POST /work-orders/:id/tasks - 添加任务
+- POST /work-orders/:id/tasks/batch - 批量添加任务
+- PUT /work-orders/tasks/:taskId - 更新任务
+- PUT /work-orders/tasks/:taskId/status - 更新任务状态
+- POST /work-orders/tasks/:taskId/sign-off - 签署 RII 任务（仅检验员）
+- DELETE /work-orders/tasks/:taskId - 删除任务
+
+#### 工单零件管理 (/work-orders/:id/parts) - 4个端点
+- GET /work-orders/:id/parts - 获取工单零件列表
+- POST /work-orders/:id/parts - 添加零件
+- POST /work-orders/:id/parts/batch - 批量添加零件
+- DELETE /work-orders/parts/:partId - 删除零件记录
+
+### 7. 前端基础
 - [x] React 19 + Vite + Tailwind CSS
 - [x] MobX 状态管理
 - [x] 基础路由布局
@@ -139,8 +203,8 @@ DroneMaintenance-Ledger 是一个面向无人机和 eVTOL 飞行器的开源 MRO
 ## 遗留问题
 
 ### 高优先级
-1. **数据库迁移** - Schema 已设计，但尚未生成和执行迁移
-2. **装机/拆下事务** - 框架已创建，需要完善事务支持
+1. ~~**数据库迁移**~~ - ✅ 已生成迁移文件 `0000_lean_lionheart.sql`，待执行
+2. ~~**装机/拆下事务**~~ - ✅ 已完成完整业务逻辑实现
 3. **前端 UI 组件** - shadcn/ui 组件尚未完全集成
 
 ### 中优先级
@@ -158,13 +222,13 @@ DroneMaintenance-Ledger 是一个面向无人机和 eVTOL 飞行器的开源 MRO
 
 ### 短期目标
 1. 执行数据库迁移，建立开发环境
-2. 完善装机/拆下事务逻辑
-3. 实现飞行记录模块 API
+2. 运行 seed 脚本填充测试数据
+3. 完善 API 集成测试
 4. 完善前端页面 UI
 
 ### 中期目标
 1. 维保调度引擎 - 多触发器计算
-2. 工单系统 - 完整的工单流转
+2. 计划与工程中心 API
 3. 库存管理 - 航材库存
 4. 数据看板 - 统计分析
 

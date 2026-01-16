@@ -5,8 +5,8 @@
  */
 
 import { pgTable, text, timestamp, uuid, integer, boolean, jsonb } from "drizzle-orm/pg-core";
-import { aircraft } from "../core/aircraft.js";
-import { user } from "../core/user.js";
+import { aircraft } from "../core/aircraft";
+import { user } from "../core/user";
 
 /**
  * Work order types

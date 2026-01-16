@@ -4,8 +4,8 @@
  * Defines individual maintenance triggers within a program
  */
 
-import { pgTable, text, timestamp, uuid, integer, jsonb } from "drizzle-orm/pg-core";
-import { maintenanceProgram } from "./maintenance-program.js";
+import { pgTable, text, timestamp, uuid, integer, jsonb, boolean } from "drizzle-orm/pg-core";
+import { maintenanceProgram } from "./maintenance-program";
 
 /**
  * Maintenance triggers table

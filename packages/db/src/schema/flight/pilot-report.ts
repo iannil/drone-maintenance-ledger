@@ -4,9 +4,9 @@
  * Pilot reports of issues/defects discovered during flight
  */
 
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { aircraft } from "../core/aircraft.js";
-import { user } from "../core/user.js";
+import { pgTable, text, timestamp, uuid, boolean } from "drizzle-orm/pg-core";
+import { aircraft } from "../core/aircraft";
+import { user } from "../core/user";
 
 /**
  * PIREP severity levels

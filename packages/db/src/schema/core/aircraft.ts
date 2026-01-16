@@ -5,7 +5,7 @@
  */
 
 import { pgTable, text, timestamp, uuid, integer, boolean } from "drizzle-orm/pg-core";
-import { fleet } from "./fleet.js";
+import { fleet } from "./fleet";
 
 /**
  * Aircraft status enum
