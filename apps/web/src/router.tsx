@@ -10,6 +10,9 @@ import { AircraftFormPage } from "./pages/aircraft-form-page";
 import { ComponentListPage } from "./pages/component-list-page";
 import { ComponentDetailPage } from "./pages/component-detail-page";
 import { ComponentFormPage } from "./pages/component-form-page";
+import { MaintenanceSchedulePage } from "./pages/maintenance-schedule-page";
+import { WorkOrderListPage } from "./pages/work-order-list-page";
+import { WorkOrderDetailPage } from "./pages/work-order-detail-page";
 
 /**
  * Application router configuration
@@ -73,6 +76,28 @@ export const router = createBrowserRouter([
       {
         path: "components/:id",
         element: <ComponentDetailPage />,
+      },
+      // Maintenance Management
+      {
+        path: "maintenance/schedules",
+        element: <MaintenanceSchedulePage />,
+      },
+      {
+        path: "maintenance/schedules/:id",
+        element: <MaintenanceSchedulePage />,
+      },
+      // Work Order Management
+      {
+        path: "work-orders",
+        element: <WorkOrderListPage />,
+      },
+      {
+        path: "work-orders/:id",
+        element: <WorkOrderDetailPage />,
+      },
+      {
+        path: "work-orders/:id/edit",
+        element: <WorkOrderDetailPage />,
       },
     ],
   },

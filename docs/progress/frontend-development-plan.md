@@ -134,19 +134,19 @@
 
 ---
 
-### Phase 4: 维保管理 ⏳ 待开发
+### Phase 4: 维保管理 🔄 进行中
 
 #### 4.1 维保计划
-- [ ] 维保计划列表页
+- [x] 维保计划列表页
 - [ ] 维保计划详情页
 - [ ] 触发器配置表单
 - [ ] 维保调度日历视图
 
 #### 4.2 工单系统
-- [ ] 工单列表页（含看板视图）
-- [ ] 工单详情页
+- [x] 工单列表页（含看板视图）
+- [x] 工单详情页
 - [ ] 工单创建/编辑表单
-- [ ] 任务完成对话框（含签字）
+- [x] 任务完成对话框（含签字）
 
 ---
 
@@ -225,8 +225,11 @@ const routes = [
       { path: "components/:id", element: <ComponentDetailPage /> }, // ✅
 
       // 维保管理
-      { path: "maintenance/schedules", element: <MaintenanceSchedulePage /> }, // ⏳
-      { path: "work-orders", element: <WorkOrderListPage /> }, // ⏳
+      { path: "maintenance/schedules", element: <MaintenanceSchedulePage /> }, // ✅
+      { path: "maintenance/schedules/:id", element: <MaintenanceSchedulePage /> }, // ⏳
+      { path: "work-orders", element: <WorkOrderListPage /> }, // ✅
+      { path: "work-orders/:id", element: <WorkOrderDetailPage /> }, // ✅
+      { path: "work-orders/:id/edit", element: <WorkOrderDetailPage /> }, // ⏳
 
       // 其他
       { path: "flight-logs", element: <FlightLogListPage /> }, // ⏳
@@ -330,7 +333,10 @@ apps/web/src/
 │   ├── aircraft-form-page.tsx ✅
 │   ├── component-list-page.tsx ✅
 │   ├── component-detail-page.tsx ✅
-│   └── component-form-page.tsx ✅
+│   ├── component-form-page.tsx ✅
+│   ├── maintenance-schedule-page.tsx ✅
+│   ├── work-order-list-page.tsx ✅
+│   └── work-order-detail-page.tsx ✅
 ├── stores/                 # MobX stores
 ├── services/               # API 服务
 ├── lib/                    # 工具函数
