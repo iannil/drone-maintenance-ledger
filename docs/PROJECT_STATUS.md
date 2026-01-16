@@ -2,7 +2,7 @@
 
 **更新时间**: 2026-01-16
 **当前版本**: 0.1.0
-**项目状态**: Phase 0-1 已完成，Phase 1 规划中
+**项目状态**: Phase 0-1 已完成，Phase 1 规划与前端开发进行中
 
 ---
 
@@ -113,6 +113,9 @@ DroneMaintenance-Ledger 是一个面向无人机和 eVTOL 飞行器的开源 MRO
 - [x] 基础路由布局
 - [x] 认证服务 (登录页、认证状态)
 - [x] 基础页面组件 (仪表板、机队列表、飞机详情)
+- [x] shadcn/ui 基础组件集成
+- [x] 35+ 页面组件框架（含飞行记录、工单、库存等）
+- [x] 装机/拆下对话框组件
 
 ---
 
@@ -175,8 +178,12 @@ DroneMaintenance-Ledger 是一个面向无人机和 eVTOL 飞行器的开源 MRO
 |------|------|------|
 | 项目进展报告 | `/docs/PROJECT_STATUS.md` | 本文档 |
 | Phase 1 计划 | `/docs/progress/phase-1-plan.md` | 下一阶段实施计划 |
+| 前端开发规划 | `/docs/frontend-development-plan.md` | 前端页面开发阶段规划 |
 | 完成报告 | `/docs/reports/completed/` | 已完成阶段的详细报告 |
+| 前端页面评估 | `/docs/reports/frontend-pages-assessment.md` | 前端实现状态评估 |
+| 清理报告 | `/docs/reports/cleanup-report.md` | 冗余内容清理记录 |
 | 文件结构规范 | `/docs/standards/file-structure.md` | 代码组织规范 |
 | 命名规范 | `/docs/standards/naming-conventions.md` | 命名约定 |
+| 用户生命周期 | `/docs/standards/user-lifecycle.md` | 用户角色与业务流程 |
 | 进度文档模板 | `/docs/templates/progress-template.md` | 进度文档模板 |
 | 完成报告模板 | `/docs/templates/completed-template.md` | 完成报告模板 |
