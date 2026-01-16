@@ -515,7 +515,7 @@ export function PirepListPage() {
         <CardContent>
           <div className="space-y-4">
             {filteredPireps.map((pirep) => {
-              const StatusIcon = STATUS_TYPES[piresp.status as keyof typeof STATUS_TYPES].icon;
+              const StatusIcon = STATUS_TYPES[pirep.status as keyof typeof STATUS_TYPES].icon;
 
               return (
                 <div
@@ -541,15 +541,15 @@ export function PirepListPage() {
                           <span className="font-mono text-sm text-primary">
                             {pirep.reportNumber}
                           </span>
-                          <Badge className={SEVERITY_LEVELS[piresp.severity as keyof typeof SEVERITY_LEVELS].color}>
-                            {SEVERITY_LEVELS[piresp.severity as keyof typeof SEVERITY_LEVELS].label}
+                          <Badge className={SEVERITY_LEVELS[pirep.severity as keyof typeof SEVERITY_LEVELS].color}>
+                            {SEVERITY_LEVELS[pirep.severity as keyof typeof SEVERITY_LEVELS].label}
                           </Badge>
-                          <Badge className={FAULT_CATEGORIES[piresp.category as keyof typeof FAULT_CATEGORIES].color}>
-                            {FAULT_CATEGORIES[piresp.category as keyof typeof FAULT_CATEGORIES].label}
+                          <Badge className={FAULT_CATEGORIES[pirep.category as keyof typeof FAULT_CATEGORIES].color}>
+                            {FAULT_CATEGORIES[pirep.category as keyof typeof FAULT_CATEGORIES].label}
                           </Badge>
-                          <Badge className={STATUS_TYPES[piresp.status as keyof typeof STATUS_TYPES].color}>
+                          <Badge className={STATUS_TYPES[pirep.status as keyof typeof STATUS_TYPES].color}>
                             <StatusIcon className="h-3 w-3 mr-1" />
-                            {STATUS_TYPES[piresp.status as keyof typeof STATUS_TYPES].label}
+                            {STATUS_TYPES[pirep.status as keyof typeof STATUS_TYPES].label}
                           </Badge>
                           {pirep.hasPhoto && (
                             <Badge variant="outline" className="gap-1">
@@ -568,39 +568,39 @@ export function PirepListPage() {
                           <span className="flex items-center gap-1">
                             <Plane className="h-3.5 w-3.5" />
                             <Link
-                              to={`/aircraft/${piresp.aircraftId}`}
+                              to={`/aircraft/${pirep.aircraftId}`}
                               className="text-primary hover:underline"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              {piresp.aircraftRegistration}
+                              {pirep.aircraftRegistration}
                             </Link>
                           </span>
                           <span className="flex items-center gap-1">
                             <Calendar className="h-3.5 w-3.5" />
-                            {new Date(piresp.reportedAt).toLocaleString("zh-CN")}
+                            {new Date(pirep.reportedAt).toLocaleString("zh-CN")}
                           </span>
                           <span className="flex items-center gap-1">
                             <User className="h-3.5 w-3.5" />
-                            {piresp.reportedBy}
+                            {pirep.reportedBy}
                           </span>
                           <span>
-                            {FLIGHT_PHASES[piresp.flightPhase as keyof typeof FLIGHT_PHASES].label}
+                            {FLIGHT_PHASES[pirep.flightPhase as keyof typeof FLIGHT_PHASES].label}
                           </span>
-                          {piresp.altitude > 0 && (
-                            <span>高度: {piresp.altitude}m</span>
+                          {pirep.altitude > 0 && (
+                            <span>高度: {pirep.altitude}m</span>
                           )}
                         </div>
 
                         {/* Work Order Link */}
-                        {piresp.workOrderId && (
+                        {pirep.workOrderId && (
                           <div className="mt-2">
                             <Link
-                              to={`/work-orders/${piresp.workOrderId}`}
+                              to={`/work-orders/${pirep.workOrderId}`}
                               className="text-xs text-primary hover:underline flex items-center gap-1"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <FileText className="h-3 w-3" />
-                              {piresp.workOrderNumber}
+                              {pirep.workOrderNumber}
                             </Link>
                           </div>
                         )}

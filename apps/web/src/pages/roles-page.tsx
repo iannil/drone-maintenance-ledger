@@ -339,12 +339,13 @@ export function RolesPage() {
             </CardHeader>
             <CardContent className="p-2">
               <div className="space-y-1">
-                {roles.map((role) => (
+                {roles.map((roleItem) => (
                   <button
-                    key={role.id}
-                    onClick={() => setSelectedRole(role)}
+                    type="button"
+                    key={roleItem.id}
+                    onClick={() => setSelectedRole(roleItem)}
                     className={`w-full text-left p-3 rounded-lg transition-colors ${
-                      selectedRole.id === role.id
+                      selectedRole.id === roleItem.id
                         ? "bg-primary text-primary-foreground"
                         : "hover:bg-slate-50"
                     }`}
@@ -353,17 +354,17 @@ export function RolesPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <Shield className="h-4 w-4 flex-shrink-0" />
-                          <span className="font-medium truncate">{role.name}</span>
+                          <span className="font-medium truncate">{roleItem.name}</span>
                         </div>
                         <div className="flex items-center gap-2 mt-1">
                           <span className={`text-xs ${
-                            selectedRole.id === role.id ? "text-primary-foreground/70" : "text-muted-foreground"
+                            selectedRole.id === roleItem.id ? "text-primary-foreground/70" : "text-muted-foreground"
                           }`}>
-                            {role.userCount} 用户
+                            {roleItem.userCount} 用户
                           </span>
-                          {role.isSystem && (
+                          {roleItem.isSystem && (
                             <Badge variant="outline" className={`text-xs ${
-                              selectedRole.id === role.id ? "border-primary-foreground/30" : ""
+                              selectedRole.id === roleItem.id ? "border-primary-foreground/30" : ""
                             }`}>
                               系统
                             </Badge>
