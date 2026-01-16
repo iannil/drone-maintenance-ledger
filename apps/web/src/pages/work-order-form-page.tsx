@@ -586,7 +586,7 @@ export function WorkOrderFormPage() {
                       <SelectValue placeholder="选择维保计划（可选）" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">无关联</SelectItem>
+                      <SelectItem value="none">无关联</SelectItem>
                       {MOCK_SCHEDULES.map((schedule) => (
                         <SelectItem key={schedule.id} value={schedule.id}>
                           <div>

@@ -691,7 +691,7 @@ export function ComponentTransfersPage() {
                   <SelectValue placeholder="选择工单（可选）" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">无关联</SelectItem>
+                  <SelectItem value="none">无关联</SelectItem>
                   {MOCK_WORK_ORDERS.map((wo) => (
                     <SelectItem key={wo.id} value={wo.id}>
                       {wo.number} - {wo.title}

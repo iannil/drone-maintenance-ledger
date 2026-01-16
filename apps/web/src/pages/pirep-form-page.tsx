@@ -328,7 +328,7 @@ export function PirepFormPage() {
                       <SelectValue placeholder="选择飞行记录（可选）" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">无关联</SelectItem>
+                      <SelectItem value="none">无关联</SelectItem>
                       <SelectItem value="fl-001">FL-20260116-001 · B-7011U · 1.2h</SelectItem>
                       <SelectItem value="fl-002">FL-20260116-002 · B-7012U · 0.8h</SelectItem>
                       <SelectItem value="fl-003">FL-20260115-001 · B-7011U · 2.1h</SelectItem>

@@ -401,7 +401,7 @@ export function MaintenanceCalendarPage() {
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <h2 className="text-xl font-semibold">
-                {year}年 {monthNames[currentDate.getMonth()]}
+                {currentDate.getFullYear()}年 {monthNames[currentDate.getMonth()]}
               </h2>
               <Button variant="outline" size="icon" onClick={nextMonth}>
                 <ChevronRight className="h-4 w-4" />

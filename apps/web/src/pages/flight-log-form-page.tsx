@@ -363,7 +363,7 @@ export function FlightLogFormPage() {
                       <SelectValue placeholder="选择副驾驶" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">无副驾驶</SelectItem>
+                      <SelectItem value="none">无副驾驶</SelectItem>
                       {MOCK_PILOTS.filter((p) => p.id !== formData.pilotId).map((pilot) => (
                         <SelectItem key={pilot.id} value={pilot.id}>
                           {pilot.name}
