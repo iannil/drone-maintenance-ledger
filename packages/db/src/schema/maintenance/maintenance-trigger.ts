@@ -4,7 +4,7 @@
  * Defines individual maintenance triggers within a program
  */
 
-import { pgTable, text, timestamp, uuid, integer, jsonb, boolean } from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { maintenanceProgram } from "./maintenance-program";
 
 /**
@@ -12,22 +12,14 @@ import { maintenanceProgram } from "./maintenance-program";
  *
  * Each trigger defines when maintenance is due based on different metrics
  */
-export const maintenanceTrigger = pgTable("maintenance_trigger", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  programId: uuid("program_id")
+export const maintenanceTrigger = sqliteTable("maintenance_trigger", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  programId: text("program_id")
     .notNull()
     .references(() => maintenanceProgram.id, { onDelete: "cascade" }),
 
   // Trigger configuration
-  type: text("type", {
-    enum: [
-      "CALENDAR_DAYS",
-      "FLIGHT_HOURS",
-      "FLIGHT_CYCLES",
-      "BATTERY_CYCLES",
-      "CALENDAR_DATE",
-    ],
-  }).notNull(),
+  type: text("type").notNull(),
 
   name: text("name").notNull(), // e.g., "50-Hour Inspection", "Annual Inspection"
   description: text("description"),
@@ -41,22 +33,20 @@ export const maintenanceTrigger = pgTable("maintenance_trigger", {
   applicableComponentLocation: text("applicable_component_location"), // e.g., "front-left" for specific motor
 
   // Priority for overdue items
-  priority: text("priority", { enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"] })
+  priority: text("priority")
     .notNull()
     .default("MEDIUM"),
 
   // Required inspection level
-  requiredRole: text("required_role", {
-    enum: ["MECHANIC", "INSPECTOR", "MANAGER"],
-  }).notNull().default("INSPECTOR"),
+  requiredRole: text("required_role").notNull().default("INSPECTOR"),
 
   // RII (Required Inspection Item) flag
   // Requires dual inspection or inspector sign-off
-  isRii: boolean("is_rii").notNull().default(false),
+  isRii: integer("is_rii", { mode: "boolean" }).notNull().default(false),
 
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at").notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer("updated_at").notNull().$defaultFn(() => Date.now()),
 });
 
 export type MaintenanceTrigger = typeof maintenanceTrigger.$inferSelect;

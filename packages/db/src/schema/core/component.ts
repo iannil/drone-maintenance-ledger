@@ -5,7 +5,7 @@
  * This is the CORE of the "component history follows component" principle
  */
 
-import { pgTable, text, timestamp, uuid, integer, boolean } from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /**
  * Component types
@@ -45,11 +45,11 @@ export type ComponentStatus = (typeof ComponentStatusEnum)[keyof typeof Componen
  * When a component is moved between aircraft, its cumulative values (totalFlightHours, etc.)
  * must transfer with it. This is aviation industry standard.
  */
-export const component = pgTable("component", {
-  id: uuid("id").primaryKey().defaultRandom(),
+export const component = sqliteTable("component", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   serialNumber: text("serial_number").notNull().unique(), // Component serial number (unique ID)
   partNumber: text("part_number").notNull(), // Manufacturer part number
-  type: text("type", { enum: Object.values(ComponentTypeEnum) }).notNull(),
+  type: text("type").notNull(),
   manufacturer: text("manufacturer").notNull(),
   model: text("model"),
   description: text("description"),
@@ -60,21 +60,21 @@ export const component = pgTable("component", {
   batteryCycles: integer("battery_cycles").notNull().default(0), // For batteries only
 
   // Life Limited Parts (LLP) tracking
-  isLifeLimited: boolean("is_life_limited").notNull().default(false),
+  isLifeLimited: integer("is_life_limited", { mode: "boolean" }).notNull().default(false),
   maxFlightHours: integer("max_flight_hours"), // Maximum hours before mandatory replacement
   maxCycles: integer("max_cycles"), // Maximum cycles before mandatory replacement
 
   // Status
-  status: text("status", { enum: Object.values(ComponentStatusEnum) })
+  status: text("status")
     .notNull()
     .default(ComponentStatusEnum.NEW),
-  isAirworthy: boolean("is_airworthy").notNull().default(true),
+  isAirworthy: integer("is_airworthy", { mode: "boolean" }).notNull().default(true),
 
   // Timestamps
-  manufacturedAt: timestamp("manufactured_at"),
-  purchasedAt: timestamp("purchased_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  manufacturedAt: integer("manufactured_at"),
+  purchasedAt: integer("purchased_at"),
+  createdAt: integer("created_at").notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer("updated_at").notNull().$defaultFn(() => Date.now()),
 });
 
 export type Component = typeof component.$inferSelect;

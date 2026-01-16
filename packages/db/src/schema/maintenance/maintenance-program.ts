@@ -4,7 +4,7 @@
  * Defines maintenance programs for aircraft models
  */
 
-import { pgTable, text, timestamp, uuid, boolean, jsonb } from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /**
  * Maintenance trigger types
@@ -25,15 +25,15 @@ export type MaintenanceTriggerType =
  *
  * Defines maintenance requirements for specific aircraft models
  */
-export const maintenanceProgram = pgTable("maintenance_program", {
-  id: uuid("id").primaryKey().defaultRandom(),
+export const maintenanceProgram = sqliteTable("maintenance_program", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   description: text("description"),
   aircraftModel: text("aircraft_model").notNull(), // e.g., "DJI Matrice 300 RTK"
-  isDefault: boolean("is_default").notNull().default(false), // Default program for this model
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false), // Default program for this model
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at").notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer("updated_at").notNull().$defaultFn(() => Date.now()),
 });
 
 export type MaintenanceProgram = typeof maintenanceProgram.$inferSelect;

@@ -4,7 +4,7 @@
  * Pilot reports of issues/defects discovered during flight
  */
 
-import { pgTable, text, timestamp, uuid, boolean } from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { aircraft } from "../core/aircraft";
 import { user } from "../core/user";
 
@@ -39,48 +39,44 @@ export type PirepStatus = (typeof PirepStatusEnum)[keyof typeof PirepStatusEnum]
  *
  * Records issues reported by pilots during/after flights
  */
-export const pilotReport = pgTable("pilot_report", {
-  id: uuid("id").primaryKey().defaultRandom(),
+export const pilotReport = sqliteTable("pilot_report", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
 
   // Aircraft and flight
-  aircraftId: uuid("aircraft_id")
+  aircraftId: text("aircraft_id")
     .notNull()
     .references(() => aircraft.id, { onDelete: "restrict" }),
-  flightLogId: uuid("flight_log_id"), // Associated flight log if applicable
+  flightLogId: text("flight_log_id"), // Associated flight log if applicable
 
   // Reporter
-  reportedBy: uuid("reported_by")
+  reportedBy: text("reported_by")
     .notNull()
     .references(() => user.id, { onDelete: "set null" }),
 
   // Issue details
   title: text("title").notNull(),
   description: text("description").notNull(),
-  severity: text("severity", {
-    enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
-  }).notNull(),
+  severity: text("severity").notNull(),
 
   // Status tracking
-  status: text("status", {
-    enum: ["OPEN", "ACKNOWLEDGED", "INVESTIGATING", "WORK_ORDER_CREATED", "RESOLVED", "CANCELLED"],
-  }).notNull().default("OPEN"),
+  status: text("status").notNull().default("OPEN"),
 
   // AOG flag
-  isAog: boolean("is_aog").notNull().default(false), // Aircraft On Ground
+  isAog: integer("is_aog", { mode: "boolean" }).notNull().default(false), // Aircraft On Ground
 
   // Affected system/component
   affectedSystem: text("affected_system"), // e.g., "POWER", "COMMUNICATION", "NAVIGATION"
   affectedComponent: text("affected_component"), // Specific component
 
   // Resolution
-  workOrderId: uuid("work_order_id"), // Link to work order if created
+  workOrderId: text("work_order_id"), // Link to work order if created
   resolution: text("resolution"),
-  resolvedAt: timestamp("resolved_at"),
-  resolvedBy: uuid("resolved_by").references(() => user.id),
+  resolvedAt: integer("resolved_at"),
+  resolvedBy: text("resolved_by").references(() => user.id),
 
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at").notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer("updated_at").notNull().$defaultFn(() => Date.now()),
 });
 
 export type PilotReport = typeof pilotReport.$inferSelect;

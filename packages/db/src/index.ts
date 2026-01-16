@@ -9,14 +9,25 @@
 
 export * from "./schema/index.js";
 
-export { drizzle } from "drizzle-orm/postgres-js";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import Database from "better-sqlite3";
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
 
-const connectionString = process.env.DATABASE_URL ?? "postgresql://localhost:5432/drone_ledger";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const dbPath = process.env.DATABASE_URL ?? path.join(__dirname, "../../database/local.db");
+
+// Create database directory if it doesn't exist
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
+const sqlite = new Database(dbPath);
 
 /**
  * Database client instance
  * Use this for querying the database
  */
-export const db = drizzle(postgres(connectionString));
+export const db = drizzle(sqlite);

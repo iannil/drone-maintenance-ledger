@@ -4,7 +4,7 @@
  * Parts consumed during work order execution
  */
 
-import { pgTable, text, timestamp, uuid, integer, boolean } from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { workOrder } from "./work-order";
 import { component } from "../core/component";
 
@@ -13,14 +13,14 @@ import { component } from "../core/component";
  *
  * Tracks parts used/consumed during work order
  */
-export const workOrderPart = pgTable("work_order_part", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  workOrderId: uuid("work_order_id")
+export const workOrderPart = sqliteTable("work_order_part", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  workOrderId: text("work_order_id")
     .notNull()
     .references(() => workOrder.id, { onDelete: "cascade" }),
 
   // Part details
-  componentId: uuid("component_id").references(() => component.id, { onDelete: "set null" }),
+  componentId: text("component_id").references(() => component.id, { onDelete: "set null" }),
   partNumber: text("part_number").notNull(),
   partName: text("part_name").notNull(),
   quantity: integer("quantity").notNull(),
@@ -30,11 +30,11 @@ export const workOrderPart = pgTable("work_order_part", {
   installedLocation: text("installed_location"), // Where installed (if applicable)
 
   // Removed parts (for replacements)
-  removedComponentId: uuid("removed_component_id").references(() => component.id),
+  removedComponentId: text("removed_component_id").references(() => component.id),
   removedSerialNumber: text("removed_serial_number"),
 
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at").notNull().$defaultFn(() => Date.now()),
 });
 
 export type WorkOrderPart = typeof workOrderPart.$inferSelect;

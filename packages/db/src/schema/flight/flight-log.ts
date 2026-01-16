@@ -4,7 +4,7 @@
  * Records of aircraft flights - the "daily diary" of each aircraft
  */
 
-import { pgTable, text, timestamp, uuid, integer, boolean } from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { aircraft } from "../core/aircraft";
 import { user } from "../core/user";
 
@@ -27,31 +27,29 @@ export type FlightType = (typeof FlightTypeEnum)[keyof typeof FlightTypeEnum];
  * Records all flights performed by aircraft
  * This is the legal record of aircraft operation
  */
-export const flightLog = pgTable("flight_log", {
-  id: uuid("id").primaryKey().defaultRandom(),
+export const flightLog = sqliteTable("flight_log", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
 
   // Aircraft
-  aircraftId: uuid("aircraft_id")
+  aircraftId: text("aircraft_id")
     .notNull()
     .references(() => aircraft.id, { onDelete: "restrict" }),
 
   // Flight details
-  flightDate: timestamp("flight_date").notNull(),
-  flightType: text("flight_type", {
-    enum: ["OPERATION", "TRAINING", "TEST", "FERRY", "DELIVERY"],
-  }).notNull().default("OPERATION"),
+  flightDate: integer("flight_date").notNull(),
+  flightType: text("flight_type").notNull().default("OPERATION"),
 
   // Locations
   departureLocation: text("departure_location").notNull(),
-  departureTime: timestamp("departure_time"),
+  departureTime: integer("departure_time"),
   arrivalLocation: text("arrival_location"),
-  arrivalTime: timestamp("arrival_time"),
+  arrivalTime: integer("arrival_time"),
 
   // Pilot info
-  pilotId: uuid("pilot_id")
+  pilotId: text("pilot_id")
     .notNull()
     .references(() => user.id, { onDelete: "set null" }),
-  copilotId: uuid("copilot_id").references(() => user.id, { onDelete: "set null" }),
+  copilotId: text("copilot_id").references(() => user.id, { onDelete: "set null" }),
 
   // Flight metrics
   flightDuration: integer("flight_duration").notNull(), // In minutes
@@ -64,8 +62,8 @@ export const flightLog = pgTable("flight_log", {
   payloadWeight: integer("payload_weight"), // kg
 
   // Pre-flight check
-  preFlightCheckCompleted: boolean("pre_flight_check_completed").notNull().default(true),
-  preFlightCheckBy: uuid("pre_flight_check_by").references(() => user.id),
+  preFlightCheckCompleted: integer("pre_flight_check_completed", { mode: "boolean" }).notNull().default(true),
+  preFlightCheckBy: text("pre_flight_check_by").references(() => user.id),
 
   // Post-flight status
   postFlightNotes: text("post_flight_notes"),
@@ -77,9 +75,9 @@ export const flightLog = pgTable("flight_log", {
   aircraftCyclesBefore: integer("aircraft_cycles_before"),
   aircraftCyclesAfter: integer("aircraft_cycles_after"),
 
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at").notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer("updated_at").notNull().$defaultFn(() => Date.now()),
 });
 
 export type FlightLog = typeof flightLog.$inferSelect;

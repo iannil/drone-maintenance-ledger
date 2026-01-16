@@ -4,7 +4,7 @@
  * Represents system users with RBAC (Role-Based Access Control)
  */
 
-import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /**
  * User roles for RBAC
@@ -24,18 +24,18 @@ export type UserRole = (typeof UserRoleEnum)[keyof typeof UserRoleEnum];
  *
  * Stores user accounts with their role and permissions
  */
-export const user = pgTable("user", {
-  id: uuid("id").primaryKey().defaultRandom(),
+export const user = sqliteTable("user", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
-  role: text("role", { enum: Object.values(UserRoleEnum) })
+  role: text("role")
     .notNull()
     .default(UserRoleEnum.PILOT),
   fullName: text("full_name"),
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at").notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer("updated_at").notNull().$defaultFn(() => Date.now()),
 });
 
 export type User = typeof user.$inferSelect;

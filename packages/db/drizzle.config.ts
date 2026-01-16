@@ -3,8 +3,8 @@ import type { Config } from "drizzle-kit";
 export default {
   schema: "./src/schema",
   out: "../../database/migrations",
-  dialect: "postgresql",
+  dialect: "sqlite",
   dbCredentials: {
-    connectionString: process.env.DATABASE_URL ?? "postgresql://localhost:5432/drone_ledger",
+    url: process.env.DATABASE_URL ?? "../database/local.db",
   },
 } satisfies Config;

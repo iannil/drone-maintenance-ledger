@@ -5,7 +5,7 @@
  * This enables component history to be independent of aircraft
  */
 
-import { pgTable, text, timestamp, uuid, integer } from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { component } from "./component";
 import { aircraft } from "./aircraft";
 
@@ -18,12 +18,12 @@ import { aircraft } from "./aircraft";
  * 2. A new installation record is created
  * 3. The component's cumulative values (totalFlightHours, etc.) transfer with it
  */
-export const componentInstallation = pgTable("component_installation", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  componentId: uuid("component_id")
+export const componentInstallation = sqliteTable("component_installation", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  componentId: text("component_id")
     .notNull()
     .references(() => component.id, { onDelete: "restrict" }),
-  aircraftId: uuid("aircraft_id")
+  aircraftId: text("aircraft_id")
     .notNull()
     .references(() => aircraft.id, { onDelete: "restrict" }),
 
@@ -40,9 +40,9 @@ export const componentInstallation = pgTable("component_installation", {
   cycles: integer("cycles").notNull().default(0),
 
   // Timestamps
-  installedAt: timestamp("installed_at").notNull().defaultNow(),
-  removedAt: timestamp("removed_at"), // NULL means currently installed
-  removedBy: uuid("removed_by"), // User who removed the component
+  installedAt: integer("installed_at").notNull().$defaultFn(() => Date.now()),
+  removedAt: integer("removed_at"), // NULL means currently installed
+  removedBy: text("removed_by"), // User who removed the component
   installNotes: text("install_notes"),
   removeNotes: text("remove_notes"),
 });

@@ -4,7 +4,7 @@
  * Individual tasks within a work order
  */
 
-import { pgTable, text, timestamp, uuid, boolean, integer, jsonb } from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { workOrder } from "./work-order";
 
 /**
@@ -25,9 +25,9 @@ export type TaskStatus = (typeof TaskStatusEnum)[keyof typeof TaskStatusEnum];
  *
  * Individual checklist items within a work order
  */
-export const workOrderTask = pgTable("work_order_task", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  workOrderId: uuid("work_order_id")
+export const workOrderTask = sqliteTable("work_order_task", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  workOrderId: text("work_order_id")
     .notNull()
     .references(() => workOrder.id, { onDelete: "cascade" }),
 
@@ -38,33 +38,28 @@ export const workOrderTask = pgTable("work_order_task", {
   instructions: text("instructions"), // Step-by-step instructions
 
   // Status
-  status: text("status", {
-    enum: ["PENDING", "IN_PROGRESS", "COMPLETED", "SKIPPED", "FAILED"],
-  }).notNull().default("PENDING"),
+  status: text("status").notNull().default("PENDING"),
 
   // RII (Required Inspection Item)
-  isRii: boolean("is_rii").notNull().default(false),
-  inspectedBy: uuid("inspected_by"), // Inspector who signed off
+  isRii: integer("is_rii", { mode: "boolean" }).notNull().default(false),
+  inspectedBy: text("inspected_by"), // Inspector who signed off
 
   // Timing
-  startedAt: timestamp("started_at"),
-  completedAt: timestamp("completed_at"),
+  startedAt: integer("started_at"),
+  completedAt: integer("completed_at"),
 
   // Results
   result: text("result"), // Pass/Fail/Findings
   notes: text("notes"),
-  photos: jsonb("photos").$type<string[]>(), // URLs to photos
+  photos: text("photos", { mode: "json" }), // URLs to photos
 
   // Required tools/parts
-  requiredTools: jsonb("required_tools").$type<string[]>(),
-  requiredParts: jsonb("required_parts").$type<{
-    partNumber: string;
-    quantity: number;
-  }[]>(),
+  requiredTools: text("required_tools", { mode: "json" }),
+  requiredParts: text("required_parts", { mode: "json" }),
 
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at").notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer("updated_at").notNull().$defaultFn(() => Date.now()),
 });
 
 export type WorkOrderTask = typeof workOrderTask.$inferSelect;

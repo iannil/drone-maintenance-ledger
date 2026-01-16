@@ -4,34 +4,28 @@
  * Run: pnpm --filter @repo/db db:seed
  */
 
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { db } from "../src/index.js";
 import * as schema from "../src/schema/index.js";
-import { users, fleets, aircraft, components, maintenancePrograms } from "../src/schema/index.js";
+import { user, fleet, aircraft, component, maintenanceProgram } from "../src/schema/index.js";
 import { hash } from "bcrypt";
-
-const DATABASE_URL = process.env.DATABASE_URL ?? "postgresql://localhost:5432/drone_ledger";
 
 async function main() {
   console.log("🌱 Starting database seed...");
 
-  const client = postgres(DATABASE_URL);
-  const db = drizzle(client, { schema });
-
   // Clean existing data (development only)
   console.log("🧹 Cleaning existing data...");
-  await db.delete(components);
+  await db.delete(component);
   await db.delete(aircraft);
-  await db.delete(fleets);
-  await db.delete(users);
-  await db.delete(maintenancePrograms);
+  await db.delete(fleet);
+  await db.delete(user);
+  await db.delete(maintenanceProgram);
 
   // Create users
   console.log("👤 Creating users...");
   const hashedPassword = await hash("password123", 10);
 
   const [adminUser] = await db
-    .insert(users)
+    .insert(user)
     .values([
       {
         username: "admin",
@@ -45,7 +39,7 @@ async function main() {
     .returning();
 
   const [managerUser] = await db
-    .insert(users)
+    .insert(user)
     .values([
       {
         username: "manager",
@@ -58,57 +52,42 @@ async function main() {
     ])
     .returning();
 
-  const [pilotUser] = await db
-    .insert(users)
-    .values([
-      {
-        username: "pilot",
-        email: "pilot@example.com",
-        passwordHash: hashedPassword,
-        role: "PILOT",
-        fullName: "飞手张三",
-        isActive: true,
-      },
-    ])
-    .returning();
-
-  const [mechanicUser] = await db
-    .insert(users)
-    .values([
-      {
-        username: "mechanic",
-        email: "mechanic@example.com",
-        passwordHash: hashedPassword,
-        role: "MECHANIC",
-        fullName: "维修工李四",
-        isActive: true,
-      },
-    ])
-    .returning();
-
-  const [inspectorUser] = await db
-    .insert(users)
-    .values([
-      {
-        username: "inspector",
-        email: "inspector@example.com",
-        passwordHash: hashedPassword,
-        role: "INSPECTOR",
-        fullName: "检验员王五",
-        isActive: true,
-      },
-    ])
-    .returning();
+  await db.insert(user).values([
+    {
+      username: "pilot",
+      email: "pilot@example.com",
+      passwordHash: hashedPassword,
+      role: "PILOT",
+      fullName: "飞手张三",
+      isActive: true,
+    },
+    {
+      username: "mechanic",
+      email: "mechanic@example.com",
+      passwordHash: hashedPassword,
+      role: "MECHANIC",
+      fullName: "维修工李四",
+      isActive: true,
+    },
+    {
+      username: "inspector",
+      email: "inspector@example.com",
+      passwordHash: hashedPassword,
+      role: "INSPECTOR",
+      fullName: "检验员王五",
+      isActive: true,
+    },
+  ]);
 
   // Create fleet
   console.log("✈️ Creating fleet...");
   const [demoFleet] = await db
-    .insert(fleets)
+    .insert(fleet)
     .values([
       {
         name: "演示机队",
         code: "DEMO-FLEET",
-        organizationId: "org-001",
+        organization: "演示公司",
         description: "用于演示的机队",
       },
     ])
@@ -120,35 +99,30 @@ async function main() {
     .insert(aircraft)
     .values([
       {
-        registrationCode: "B-1234",
+        registrationNumber: "B-1234",
         serialNumber: "SN-001",
         model: "DJI Matrice 300 RTK",
         manufacturer: "DJI",
         fleetId: demoFleet.id,
-        status: "SERVICEABLE",
-        productionDate: new Date("2023-01-01"),
+        status: "AVAILABLE",
       },
     ])
     .returning();
 
-  const [aircraft2] = await db
-    .insert(aircraft)
-    .values([
-      {
-        registrationCode: "B-5678",
-        serialNumber: "SN-002",
-        model: "DJI Matrice 300 RTK",
-        manufacturer: "DJI",
-        fleetId: demoFleet.id,
-        status: "MAINTENANCE",
-        productionDate: new Date("2023-03-01"),
-      },
-    ])
-    .returning();
+  await db.insert(aircraft).values([
+    {
+      registrationNumber: "B-5678",
+      serialNumber: "SN-002",
+      model: "DJI Matrice 300 RTK",
+      manufacturer: "DJI",
+      fleetId: demoFleet.id,
+      status: "IN_MAINTENANCE",
+    },
+  ]);
 
   // Create components
   console.log("⚙️ Creating components...");
-  await db.insert(components).values([
+  await db.insert(component).values([
     // Aircraft 1 components
     {
       serialNumber: "MOTOR-001-LF",
@@ -159,8 +133,8 @@ async function main() {
       status: "INSTALLED",
       currentAircraftId: aircraft1.id,
       installPosition: "LF", // Left Front
-      flightHours: 45.5,
-      cycleCount: 230,
+      totalFlightHours: 45.5,
+      totalFlightCycles: 230,
     },
     {
       serialNumber: "MOTOR-002-RF",
@@ -171,8 +145,8 @@ async function main() {
       status: "INSTALLED",
       currentAircraftId: aircraft1.id,
       installPosition: "RF", // Right Front
-      flightHours: 45.5,
-      cycleCount: 230,
+      totalFlightHours: 45.5,
+      totalFlightCycles: 230,
     },
     {
       serialNumber: "MOTOR-003-LR",
@@ -183,8 +157,8 @@ async function main() {
       status: "INSTALLED",
       currentAircraftId: aircraft1.id,
       installPosition: "LR", // Left Rear
-      flightHours: 45.5,
-      cycleCount: 230,
+      totalFlightHours: 45.5,
+      totalFlightCycles: 230,
     },
     {
       serialNumber: "MOTOR-004-RR",
@@ -195,8 +169,8 @@ async function main() {
       status: "INSTALLED",
       currentAircraftId: aircraft1.id,
       installPosition: "RR", // Right Rear
-      flightHours: 45.5,
-      cycleCount: 230,
+      totalFlightHours: 45.5,
+      totalFlightCycles: 230,
     },
     {
       serialNumber: "BATT-001",
@@ -207,8 +181,8 @@ async function main() {
       status: "INSTALLED",
       currentAircraftId: aircraft1.id,
       installPosition: "BAY-1",
-      flightHours: 25.0,
-      cycleCount: 45,
+      totalFlightHours: 25.0,
+      totalFlightCycles: 45,
     },
     {
       serialNumber: "BATT-002",
@@ -219,8 +193,8 @@ async function main() {
       status: "INSTALLED",
       currentAircraftId: aircraft1.id,
       installPosition: "BAY-2",
-      flightHours: 32.0,
-      cycleCount: 67,
+      totalFlightHours: 32.0,
+      totalFlightCycles: 67,
     },
     // Removed component (in inventory)
     {
@@ -231,16 +205,16 @@ async function main() {
       manufacturer: "DJI",
       status: "REMOVED",
       currentAircraftId: null,
-      flightHours: 120.0,
-      cycleCount: 450,
-      lifeLimitHours: 500,
-      isLifeLimitedPart: true,
+      totalFlightHours: 120.0,
+      totalFlightCycles: 450,
+      maxFlightHours: 500,
+      isLifeLimited: true,
     },
   ]);
 
   // Create maintenance programs
   console.log("📋 Creating maintenance programs...");
-  await db.insert(maintenancePrograms).values([
+  await db.insert(maintenanceProgram).values([
     {
       name: "50小时定检",
       code: "M300-50H",
@@ -271,8 +245,6 @@ async function main() {
   console.log("  - pilot / password123 (飞手)");
   console.log("  - mechanic / password123 (维修工)");
   console.log("  - inspector / password123 (检验员)");
-
-  await client.end();
 }
 
 main().catch((error) => {

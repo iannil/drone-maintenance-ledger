@@ -5,7 +5,7 @@
  * This is a legally significant document
  */
 
-import { pgTable, text, timestamp, uuid, boolean } from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { aircraft } from "../core/aircraft";
 import { user } from "../core/user";
 
@@ -25,24 +25,22 @@ export type ReleaseStatus = (typeof ReleaseStatusEnum)[keyof typeof ReleaseStatu
  *
  * Records authorization for aircraft to return to service
  */
-export const releaseRecord = pgTable("release_record", {
-  id: uuid("id").primaryKey().defaultRandom(),
+export const releaseRecord = sqliteTable("release_record", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
 
   // Aircraft
-  aircraftId: uuid("aircraft_id")
+  aircraftId: text("aircraft_id")
     .notNull()
     .references(() => aircraft.id, { onDelete: "restrict" }),
 
   // Associated work order (if applicable)
-  workOrderId: uuid("work_order_id"),
+  workOrderId: text("work_order_id"),
 
   // Release details
-  releaseStatus: text("release_status", {
-    enum: ["GROUNDED", "CONDITIONAL", "FULL"],
-  }).notNull().default("FULL"),
+  releaseStatus: text("release_status").notNull().default("FULL"),
 
   // Authorizing personnel
-  releasedBy: uuid("released_by")
+  releasedBy: text("released_by")
     .notNull()
     .references(() => user.id, { onDelete: "set null" }),
   releaseCertificateNumber: text("release_certificate_number"), // Form 1 or equivalent
@@ -60,12 +58,12 @@ export const releaseRecord = pgTable("release_record", {
   signatureHash: text("signature_hash"),
 
   // Validity
-  isValid: boolean("is_valid").notNull().default(true),
-  supersededBy: uuid("superseded_by"), // If this release is superseded by another
+  isValid: integer("is_valid", { mode: "boolean" }).notNull().default(true),
+  supersededBy: text("superseded_by"), // If this release is superseded by another
 
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at").notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer("updated_at").notNull().$defaultFn(() => Date.now()),
 });
 
 export type ReleaseRecord = typeof releaseRecord.$inferSelect;

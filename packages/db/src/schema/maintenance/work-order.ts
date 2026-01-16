@@ -4,7 +4,7 @@
  * Manages maintenance work orders
  */
 
-import { pgTable, text, timestamp, uuid, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { aircraft } from "../core/aircraft";
 import { user } from "../core/user";
 
@@ -54,23 +54,19 @@ export type WorkOrderPriority = (typeof WorkOrderPriorityEnum)[keyof typeof Work
  *
  * Main work order management
  */
-export const workOrder = pgTable("work_order", {
-  id: uuid("id").primaryKey().defaultRandom(),
+export const workOrder = sqliteTable("work_order", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   orderNumber: text("order_number").notNull().unique(), // Human-readable WO number
 
   // Aircraft
-  aircraftId: uuid("aircraft_id")
+  aircraftId: text("aircraft_id")
     .notNull()
     .references(() => aircraft.id, { onDelete: "restrict" }),
 
   // Type and status
-  type: text("type", {
-    enum: ["SCHEDULED", "INSPECTION", "REPAIR", "MODIFICATION", "EMERGENCY"],
-  }).notNull(),
-  status: text("status", {
-    enum: ["DRAFT", "OPEN", "IN_PROGRESS", "PENDING_PARTS", "PENDING_INSPECTION", "COMPLETED", "RELEASED", "CANCELLED"],
-  }).notNull().default("DRAFT"),
-  priority: text("priority", { enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"] })
+  type: text("type").notNull(),
+  status: text("status").notNull().default("DRAFT"),
+  priority: text("priority")
     .notNull()
     .default("MEDIUM"),
 
@@ -80,35 +76,35 @@ export const workOrder = pgTable("work_order", {
   reason: text("reason"), // Why this work is needed (for repairs)
 
   // Assignment
-  assignedTo: uuid("assigned_to").references(() => user.id, { onDelete: "set null" }),
-  assignedAt: timestamp("assigned_at"),
+  assignedTo: text("assigned_to").references(() => user.id, { onDelete: "set null" }),
+  assignedAt: integer("assigned_at"),
 
   // Scheduling
-  scheduledStart: timestamp("scheduled_start"),
-  scheduledEnd: timestamp("scheduled_end"),
-  actualStart: timestamp("actual_start"),
-  actualEnd: timestamp("actual_end"),
+  scheduledStart: integer("scheduled_start"),
+  scheduledEnd: integer("scheduled_end"),
+  actualStart: integer("actual_start"),
+  actualEnd: integer("actual_end"),
 
   // Aircraft status at work order creation
   aircraftHours: integer("aircraft_hours"), // Aircraft hours at WO creation
   aircraftCycles: integer("aircraft_cycles"), // Aircraft cycles at WO creation
 
   // Sign-off
-  completedBy: uuid("completed_by").references(() => user.id, { onDelete: "set null" }),
-  completedAt: timestamp("completed_at"),
-  releasedBy: uuid("released_by").references(() => user.id, { onDelete: "set null" }),
-  releasedAt: timestamp("released_at"),
+  completedBy: text("completed_by").references(() => user.id, { onDelete: "set null" }),
+  completedAt: integer("completed_at"),
+  releasedBy: text("released_by").references(() => user.id, { onDelete: "set null" }),
+  releasedAt: integer("released_at"),
 
   // Notes
   completionNotes: text("completion_notes"),
   discrepancies: text("discrepancies"),
 
   // Linked maintenance schedule (if applicable)
-  scheduleId: uuid("schedule_id"),
+  scheduleId: text("schedule_id"),
 
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at").notNull().$defaultFn(() => Date.now()),
+  updatedAt: integer("updated_at").notNull().$defaultFn(() => Date.now()),
 });
 
 export type WorkOrder = typeof workOrder.$inferSelect;
