@@ -10,6 +10,7 @@ import {
   Delete,
   Query,
   ParseIntPipe,
+  Inject,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 
@@ -26,7 +27,11 @@ import type { User } from "@repo/db";
 @Controller("users")
 @UseGuards(AuthGuard("jwt"), RolesGuard)
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  private userService: UserService;
+
+  constructor(@Inject(UserService) userService: UserService) {
+    this.userService = userService;
+  }
 
   /**
    * Get current user profile

@@ -10,6 +10,7 @@ import {
   Query,
   ParseIntPipe,
   BadRequestException,
+  Inject,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 
@@ -30,7 +31,11 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 @Controller("flight-logs")
 @UseGuards(AuthGuard("jwt"), RolesGuard)
 export class FlightLogController {
-  constructor(private readonly flightLogService: FlightLogService) {}
+  private flightLogService: FlightLogService;
+
+  constructor(@Inject(FlightLogService) flightLogService: FlightLogService) {
+    this.flightLogService = flightLogService;
+  }
 
   /**
    * Get flight log by ID

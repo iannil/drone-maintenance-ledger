@@ -10,6 +10,7 @@ import {
   Query,
   ParseIntPipe,
   Request,
+  Inject,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 
@@ -32,7 +33,11 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 @Controller("release-records")
 @UseGuards(AuthGuard("jwt"), RolesGuard)
 export class ReleaseRecordController {
-  constructor(private readonly releaseRecordService: ReleaseRecordService) {}
+  private releaseRecordService: ReleaseRecordService;
+
+  constructor(@Inject(ReleaseRecordService) releaseRecordService: ReleaseRecordService) {
+    this.releaseRecordService = releaseRecordService;
+  }
 
   /**
    * Get release record by ID

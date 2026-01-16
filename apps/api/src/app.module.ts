@@ -12,7 +12,7 @@ import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [".env.local", ".env"],
+      envFilePath: ["../../.env.local", "../../.env"],
     }),
 
     // Feature modules

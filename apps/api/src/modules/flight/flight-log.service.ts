@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from "@nestjs/common";
+import { Injectable, NotFoundException, ConflictException, Inject } from "@nestjs/common";
 
 import type { FlightLog } from "@repo/db";
 import { FlightLogRepository } from "./repositories/flight-log.repository";
@@ -53,7 +53,11 @@ export interface UpdateFlightLogDto {
  */
 @Injectable()
 export class FlightLogService {
-  constructor(private readonly flightLogRepository: FlightLogRepository) {}
+  private flightLogRepository: FlightLogRepository;
+
+  constructor(@Inject(FlightLogRepository) flightLogRepository: FlightLogRepository) {
+    this.flightLogRepository = flightLogRepository;
+  }
 
   /**
    * Find flight log by ID

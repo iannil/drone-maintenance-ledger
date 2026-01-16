@@ -9,6 +9,7 @@ import {
   Delete,
   Query,
   ParseIntPipe,
+  Inject,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 
@@ -30,7 +31,11 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 @Controller("components")
 @UseGuards(AuthGuard("jwt"), RolesGuard)
 export class ComponentController {
-  constructor(private readonly componentService: ComponentService) {}
+  private componentService: ComponentService;
+
+  constructor(@Inject(ComponentService) componentService: ComponentService) {
+    this.componentService = componentService;
+  }
 
   /**
    * Get component by ID

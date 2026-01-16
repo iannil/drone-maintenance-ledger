@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import { Injectable, NotFoundException, ForbiddenException, Inject } from "@nestjs/common";
 
 import type { ReleaseRecord } from "@repo/db";
 import { ReleaseRecordRepository } from "./repositories/release-record.repository";
@@ -38,7 +38,11 @@ export interface SignReleaseDto {
  */
 @Injectable()
 export class ReleaseRecordService {
-  constructor(private readonly releaseRecordRepository: ReleaseRecordRepository) {}
+  private releaseRecordRepository: ReleaseRecordRepository;
+
+  constructor(@Inject(ReleaseRecordRepository) releaseRecordRepository: ReleaseRecordRepository) {
+    this.releaseRecordRepository = releaseRecordRepository;
+  }
 
   /**
    * Find release record by ID

@@ -8,13 +8,14 @@ import {
   Put,
   Delete,
   Query,
-  ParseIntPipe,
+  Inject,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 
 import { AircraftService, CreateAircraftDto, UpdateAircraftDto } from "./aircraft.service";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RolesGuard } from "../../common/guards/roles.guard";
+import type { Aircraft } from "@repo/db";
 
 /**
  * Aircraft controller
@@ -24,14 +25,18 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 @Controller("aircraft")
 @UseGuards(AuthGuard("jwt"), RolesGuard)
 export class AircraftController {
-  constructor(private readonly aircraftService: AircraftService) {}
+  private aircraftSvc: AircraftService;
+
+  constructor(@Inject(AircraftService) aircraftService: AircraftService) {
+    this.aircraftSvc = aircraftService;
+  }
 
   /**
    * Get aircraft by ID
    */
   @Get(":id")
   async getById(@Param("id") id: string) {
-    return this.aircraftService.findById(id);
+    return this.aircraftSvc.findById(id);
   }
 
   /**
@@ -39,14 +44,16 @@ export class AircraftController {
    */
   @Get()
   async list(
-    @Query("limit", new ParseIntPipe({ optional: true })) limit = 50,
-    @Query("offset", new ParseIntPipe({ optional: true })) offset = 0,
+    @Query("limit") limitStr?: string,
+    @Query("offset") offsetStr?: string,
     @Query("fleetId") fleetId?: string,
   ) {
+    const limit = limitStr ? parseInt(limitStr, 10) : 50;
+    const offset = offsetStr ? parseInt(offsetStr, 10) : 0;
     if (fleetId) {
-      return this.aircraftService.findByFleet(fleetId, limit, offset);
+      return this.aircraftSvc.findByFleet(fleetId, limit, offset);
     }
-    return this.aircraftService.list(limit, offset);
+    return this.aircraftSvc.list(limit, offset);
   }
 
   /**
@@ -54,7 +61,7 @@ export class AircraftController {
    */
   @Get("status/counts")
   async getStatusCounts(@Query("fleetId") fleetId?: string) {
-    return this.aircraftService.getStatusCounts(fleetId);
+    return this.aircraftSvc.getStatusCounts(fleetId);
   }
 
   /**
@@ -63,7 +70,7 @@ export class AircraftController {
   @Post()
   @Roles("ADMIN", "MANAGER")
   async create(@Body() dto: CreateAircraftDto) {
-    return this.aircraftService.create(dto);
+    return this.aircraftSvc.create(dto);
   }
 
   /**
@@ -72,7 +79,7 @@ export class AircraftController {
   @Put(":id")
   @Roles("ADMIN", "MANAGER")
   async update(@Param("id") id: string, @Body() dto: UpdateAircraftDto) {
-    return this.aircraftService.update(id, dto);
+    return this.aircraftSvc.update(id, dto);
   }
 
   /**
@@ -84,7 +91,7 @@ export class AircraftController {
     @Param("id") id: string,
     @Body() body: { status: Aircraft["status"]; isAirworthy?: boolean },
   ) {
-    return this.aircraftService.updateStatus(id, body.status, body.isAirworthy);
+    return this.aircraftSvc.updateStatus(id, body.status, body.isAirworthy);
   }
 
   /**
@@ -93,7 +100,7 @@ export class AircraftController {
   @Delete(":id")
   @Roles("ADMIN")
   async delete(@Param("id") id: string) {
-    await this.aircraftService.delete(id);
+    await this.aircraftSvc.delete(id);
     return { success: true };
   }
 }

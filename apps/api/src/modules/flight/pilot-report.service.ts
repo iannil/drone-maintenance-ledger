@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, Inject } from "@nestjs/common";
 
 import type { PilotReport } from "@repo/db";
 import { PilotReportRepository } from "./repositories/pilot-report.repository";
@@ -40,7 +40,11 @@ export interface UpdateStatusDto {
  */
 @Injectable()
 export class PilotReportService {
-  constructor(private readonly pilotReportRepository: PilotReportRepository) {}
+  private pilotReportRepository: PilotReportRepository;
+
+  constructor(@Inject(PilotReportRepository) pilotReportRepository: PilotReportRepository) {
+    this.pilotReportRepository = pilotReportRepository;
+  }
 
   /**
    * Find pilot report by ID

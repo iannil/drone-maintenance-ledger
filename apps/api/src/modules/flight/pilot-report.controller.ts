@@ -10,6 +10,7 @@ import {
   Query,
   ParseIntPipe,
   Request,
+  Inject,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 
@@ -31,7 +32,11 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 @Controller("pilot-reports")
 @UseGuards(AuthGuard("jwt"), RolesGuard)
 export class PilotReportController {
-  constructor(private readonly pilotReportService: PilotReportService) {}
+  private pilotReportService: PilotReportService;
+
+  constructor(@Inject(PilotReportService) pilotReportService: PilotReportService) {
+    this.pilotReportService = pilotReportService;
+  }
 
   /**
    * Get pilot report by ID

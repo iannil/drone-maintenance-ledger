@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { eq, and, desc, asc } from "drizzle-orm";
+import { eq, and, desc, asc, sql } from "drizzle-orm";
 
 import type { PilotReport, NewPilotReport } from "@repo/db";
 import { pilotReport } from "@repo/db";

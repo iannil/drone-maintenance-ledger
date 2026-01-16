@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from "@nestjs/common";
+import { Injectable, NotFoundException, ConflictException, Inject } from "@nestjs/common";
 
 import type { WorkOrder, WorkOrderTask, WorkOrderPart } from "@repo/db";
 import { WorkOrderRepository } from "./repositories/work-order.repository";
@@ -70,11 +70,19 @@ export interface AddPartDto {
  */
 @Injectable()
 export class WorkOrderService {
+  private workOrderRepository: WorkOrderRepository;
+  private taskRepository: WorkOrderTaskRepository;
+  private partRepository: WorkOrderPartRepository;
+
   constructor(
-    private readonly workOrderRepository: WorkOrderRepository,
-    private readonly taskRepository: WorkOrderTaskRepository,
-    private readonly partRepository: WorkOrderPartRepository,
-  ) {}
+    @Inject(WorkOrderRepository) workOrderRepository: WorkOrderRepository,
+    @Inject(WorkOrderTaskRepository) taskRepository: WorkOrderTaskRepository,
+    @Inject(WorkOrderPartRepository) partRepository: WorkOrderPartRepository,
+  ) {
+    this.workOrderRepository = workOrderRepository;
+    this.taskRepository = taskRepository;
+    this.partRepository = partRepository;
+  }
 
   /**
    * Find work order by ID

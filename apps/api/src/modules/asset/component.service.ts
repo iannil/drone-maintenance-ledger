@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from "@nestjs/common";
+import { Injectable, ConflictException, NotFoundException, Inject } from "@nestjs/common";
 
 import type { Component, ComponentInstallation, NewComponent } from "@repo/db";
 import { ComponentRepository } from "./repositories/component.repository";
@@ -53,7 +53,11 @@ export interface RemoveComponentDto {
  */
 @Injectable()
 export class ComponentService {
-  constructor(private readonly componentRepository: ComponentRepository) {}
+  private componentRepository: ComponentRepository;
+
+  constructor(@Inject(ComponentRepository) componentRepository: ComponentRepository) {
+    this.componentRepository = componentRepository;
+  }
 
   /**
    * Find component by ID

@@ -5,11 +5,10 @@ import {
   Post,
   Body,
   UseGuards,
-  Request,
   Put,
   Delete,
   Query,
-  ParseIntPipe,
+  Inject,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 
@@ -25,14 +24,18 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 @Controller("fleets")
 @UseGuards(AuthGuard("jwt"), RolesGuard)
 export class FleetController {
-  constructor(private readonly fleetService: FleetService) {}
+  private fleetSvc: FleetService;
+
+  constructor(@Inject(FleetService) fleetService: FleetService) {
+    this.fleetSvc = fleetService;
+  }
 
   /**
    * Get fleet by ID
    */
   @Get(":id")
   async getById(@Param("id") id: string) {
-    return this.fleetService.findById(id);
+    return this.fleetSvc.findById(id);
   }
 
   /**
@@ -40,18 +43,21 @@ export class FleetController {
    */
   @Get()
   async list(
-    @Query("limit", new ParseIntPipe({ optional: true })) limit = 50,
-    @Query("offset", new ParseIntPipe({ optional: true })) offset = 0,
+    @Query("limit") limitStr?: string,
+    @Query("offset") offsetStr?: string,
   ) {
-    return this.fleetService.list(limit, offset);
+    const limit = limitStr ? parseInt(limitStr, 10) : 50;
+    const offset = offsetStr ? parseInt(offsetStr, 10) : 0;
+    return this.fleetSvc.list(limit, offset);
   }
 
   /**
    * Search fleets
    */
   @Get("search/:query")
-  async search(@Param("query") query: string, @Query("limit", new ParseIntPipe({ optional: true })) limit = 50) {
-    return this.fleetService.search(query, limit);
+  async search(@Param("query") query: string, @Query("limit") limitStr?: string) {
+    const limit = limitStr ? parseInt(limitStr, 10) : 50;
+    return this.fleetSvc.search(query, limit);
   }
 
   /**
@@ -60,7 +66,7 @@ export class FleetController {
   @Post()
   @Roles("ADMIN", "MANAGER")
   async create(@Body() dto: CreateFleetDto) {
-    return this.fleetService.create(dto);
+    return this.fleetSvc.create(dto);
   }
 
   /**
@@ -69,7 +75,7 @@ export class FleetController {
   @Put(":id")
   @Roles("ADMIN", "MANAGER")
   async update(@Param("id") id: string, @Body() dto: UpdateFleetDto) {
-    return this.fleetService.update(id, dto);
+    return this.fleetSvc.update(id, dto);
   }
 
   /**
@@ -78,7 +84,7 @@ export class FleetController {
   @Delete(":id")
   @Roles("ADMIN")
   async delete(@Param("id") id: string) {
-    await this.fleetService.delete(id);
+    await this.fleetSvc.delete(id);
     return { success: true };
   }
 }

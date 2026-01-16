@@ -10,6 +10,7 @@ import {
   Query,
   ParseIntPipe,
   Request,
+  Inject,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 
@@ -33,7 +34,11 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 @Controller("work-orders")
 @UseGuards(AuthGuard("jwt"), RolesGuard)
 export class WorkOrderController {
-  constructor(private readonly workOrderService: WorkOrderService) {}
+  private workOrderService: WorkOrderService;
+
+  constructor(@Inject(WorkOrderService) workOrderService: WorkOrderService) {
+    this.workOrderService = workOrderService;
+  }
 
   /**
    * Get work order by ID
