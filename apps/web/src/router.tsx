@@ -13,6 +13,8 @@ import { ComponentFormPage } from "./pages/component-form-page";
 import { MaintenanceSchedulePage } from "./pages/maintenance-schedule-page";
 import { WorkOrderListPage } from "./pages/work-order-list-page";
 import { WorkOrderDetailPage } from "./pages/work-order-detail-page";
+import { FlightLogListPage } from "./pages/flight-log-list-page";
+import { FlightLogDetailPage } from "./pages/flight-log-detail-page";
 
 /**
  * Application router configuration
@@ -98,6 +100,19 @@ export const router = createBrowserRouter([
       {
         path: "work-orders/:id/edit",
         element: <WorkOrderDetailPage />,
+      },
+      // Flight Logs
+      {
+        path: "flight-logs",
+        element: <FlightLogListPage />,
+      },
+      {
+        path: "flight-logs/:id",
+        element: <FlightLogDetailPage />,
+      },
+      {
+        path: "flight-logs/:id/edit",
+        element: <FlightLogDetailPage />,
       },
     ],
   },

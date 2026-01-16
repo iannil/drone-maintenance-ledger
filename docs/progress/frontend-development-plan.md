@@ -150,12 +150,12 @@
 
 ---
 
-### Phase 5: 飞行记录 ⏳ 待开发
+### Phase 5: 飞行记录 🔄 进行中
 
-- [ ] 飞行日志列表页
-- [ ] 飞行日志详情页
+- [x] 飞行日志列表页
+- [x] 飞行日志详情页
 - [ ] 飞行日志创建表单
-- [ ] 飞行员报告页面
+- [x] 飞行员报告页面（集成在详情页）
 - [ ] 放行记录页面
 
 ---
@@ -232,7 +232,9 @@ const routes = [
       { path: "work-orders/:id/edit", element: <WorkOrderDetailPage /> }, // ⏳
 
       // 其他
-      { path: "flight-logs", element: <FlightLogListPage /> }, // ⏳
+      { path: "flight-logs", element: <FlightLogListPage /> }, // ✅
+      { path: "flight-logs/:id", element: <FlightLogDetailPage /> }, // ✅
+      { path: "flight-logs/:id/edit", element: <FlightLogDetailPage /> }, // ⏳
       { path: "reports", element: <ReportsDashboardPage /> }, // ⏳
       { path: "settings", element: <SettingsPage /> }, // ⏳
     ],
@@ -336,7 +338,9 @@ apps/web/src/
 │   ├── component-form-page.tsx ✅
 │   ├── maintenance-schedule-page.tsx ✅
 │   ├── work-order-list-page.tsx ✅
-│   └── work-order-detail-page.tsx ✅
+│   ├── work-order-detail-page.tsx ✅
+│   ├── flight-log-list-page.tsx ✅
+│   └── flight-log-detail-page.tsx ✅
 ├── stores/                 # MobX stores
 ├── services/               # API 服务
 ├── lib/                    # 工具函数
