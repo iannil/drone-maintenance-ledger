@@ -1,5 +1,6 @@
-import { Controller, Post, Body, UseGuards, Request, Get } from "@nestjs/common";
+import { Controller, Post, Body, UseGuards, Request, Get, Inject } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import { IsString, IsOptional, IsEmail, IsNotEmpty } from "class-validator";
 
 import { AuthService } from "./auth.service";
 import type { User } from "@repo/db";
@@ -7,19 +8,37 @@ import type { User } from "@repo/db";
 /**
  * Register DTO
  */
-interface RegisterDto {
+class RegisterDto {
+  @IsString()
+  @IsNotEmpty()
   username: string;
+
+  @IsEmail()
   email: string;
+
+  @IsString()
+  @IsNotEmpty()
   password: string;
+
+  @IsString()
+  @IsOptional()
   fullName?: string;
+
+  @IsString()
+  @IsOptional()
   role?: User["role"];
 }
 
 /**
  * Login DTO
  */
-interface LoginDto {
+class LoginDto {
+  @IsString()
+  @IsNotEmpty()
   username: string;
+
+  @IsString()
+  @IsNotEmpty()
   password: string;
 }
 
@@ -30,7 +49,11 @@ interface LoginDto {
  */
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  private authSvc: AuthService;
+
+  constructor(@Inject(AuthService) authService: AuthService) {
+    this.authSvc = authService;
+  }
 
   /**
    * Register endpoint
@@ -38,17 +61,16 @@ export class AuthController {
    */
   @Post("register")
   async register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+    return this.authSvc.register(dto);
   }
 
   /**
    * Login endpoint
    * Returns JWT token on successful authentication
    */
-  @UseGuards(AuthGuard("local"))
   @Post("login")
-  async login(@Request() req) {
-    return this.authService.login(req.body.username, req.body.password);
+  async login(@Body() dto: LoginDto) {
+    return this.authSvc.login(dto.username, dto.password);
   }
 
   /**

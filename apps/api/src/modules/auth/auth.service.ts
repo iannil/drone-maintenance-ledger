@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable, UnauthorizedException, Inject } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 
@@ -12,17 +12,25 @@ import { UserService } from "../user/user.service";
  */
 @Injectable()
 export class AuthService {
+  private jwtSvc: JwtService;
+  private configSvc: ConfigService;
+  private userSvc: UserService;
+
   constructor(
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
-    private readonly userService: UserService,
-  ) {}
+    @Inject(JwtService) jwtService: JwtService,
+    @Inject(ConfigService) configService: ConfigService,
+    @Inject(UserService) userService: UserService,
+  ) {
+    this.jwtSvc = jwtService;
+    this.configSvc = configService;
+    this.userSvc = userService;
+  }
 
   /**
    * Validate user credentials
    */
   async validateUser(username: string, password: string): Promise<Omit<User, "passwordHash">> {
-    const user = await this.userService.verifyCredentials(username, password);
+    const user = await this.userSvc.verifyCredentials(username, password);
 
     if (!user) {
       throw new UnauthorizedException("Invalid credentials");
@@ -53,7 +61,7 @@ export class AuthService {
     fullName?: string;
     role?: User["role"];
   }) {
-    const user = await this.userService.register(dto);
+    const user = await this.userSvc.register(dto);
     return this.generateTokens(user);
   }
 
@@ -68,7 +76,7 @@ export class AuthService {
     };
 
     return {
-      accessToken: this.jwtService.sign(payload),
+      accessToken: this.jwtSvc.sign(payload),
       user: {
         id: user.id,
         username: user.username,
@@ -84,7 +92,7 @@ export class AuthService {
    */
   async verifyToken(token: string) {
     try {
-      return await this.jwtService.verifyAsync(token);
+      return await this.jwtSvc.verifyAsync(token);
     } catch {
       throw new UnauthorizedException("Invalid token");
     }

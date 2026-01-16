@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from "@nestjs/common";
+import { Injectable, ConflictException, NotFoundException, Inject } from "@nestjs/common";
 
 import type { User } from "@repo/db";
 
@@ -29,27 +29,31 @@ export interface UpdateUserDto {
  */
 @Injectable()
 export class UserService {
-  constructor(private readonly userRepository: UserRepository) {}
+  private userRepo: UserRepository;
+
+  constructor(@Inject(UserRepository) userRepository: UserRepository) {
+    this.userRepo = userRepository;
+  }
 
   /**
    * Find user by ID
    */
   async findById(id: string): Promise<User | null> {
-    return this.userRepository.findById(id);
+    return this.userRepo.findById(id);
   }
 
   /**
    * Find user by username
    */
   async findByUsername(username: string): Promise<User | null> {
-    return this.userRepository.findByUsername(username);
+    return this.userRepo.findByUsername(username);
   }
 
   /**
    * Find user by email
    */
   async findByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findByEmail(email);
+    return this.userRepo.findByEmail(email);
   }
 
   /**
@@ -57,19 +61,19 @@ export class UserService {
    */
   async register(dto: RegisterDto): Promise<Omit<User, "passwordHash">> {
     // Check if username already exists
-    const existingByUsername = await this.userRepository.findByUsername(dto.username);
+    const existingByUsername = await this.userRepo.findByUsername(dto.username);
     if (existingByUsername) {
       throw new ConflictException("Username already exists");
     }
 
     // Check if email already exists
-    const existingByEmail = await this.userRepository.findByEmail(dto.email);
+    const existingByEmail = await this.userRepo.findByEmail(dto.email);
     if (existingByEmail) {
       throw new ConflictException("Email already exists");
     }
 
     // Create user
-    const user = await this.userRepository.create({
+    const user = await this.userRepo.create({
       username: dto.username,
       email: dto.email,
       password: dto.password,
@@ -87,12 +91,12 @@ export class UserService {
    * Verify user credentials
    */
   async verifyCredentials(username: string, password: string): Promise<Omit<User, "passwordHash"> | null> {
-    const user = await this.userRepository.findByUsername(username);
+    const user = await this.userRepo.findByUsername(username);
     if (!user) {
       return null;
     }
 
-    const isValid = await this.userRepository.verifyPassword(password, user.passwordHash);
+    const isValid = await this.userRepo.verifyPassword(password, user.passwordHash);
     if (!isValid) {
       return null;
     }
@@ -105,20 +109,20 @@ export class UserService {
    * Update user
    */
   async update(id: string, dto: UpdateUserDto): Promise<Omit<User, "passwordHash">> {
-    const existing = await this.userRepository.findById(id);
+    const existing = await this.userRepo.findById(id);
     if (!existing) {
       throw new NotFoundException("User not found");
     }
 
     // Check email uniqueness if changing email
     if (dto.email && dto.email !== existing.email) {
-      const existingByEmail = await this.userRepository.findByEmail(dto.email);
+      const existingByEmail = await this.userRepo.findByEmail(dto.email);
       if (existingByEmail) {
         throw new ConflictException("Email already exists");
       }
     }
 
-    const updated = await this.userRepository.update(id, dto);
+    const updated = await this.userRepo.update(id, dto);
     const { passwordHash: _unused, ...userWithoutPassword } = updated;
     return userWithoutPassword;
   }
@@ -127,19 +131,19 @@ export class UserService {
    * Delete user
    */
   async delete(id: string): Promise<void> {
-    const existing = await this.userRepository.findById(id);
+    const existing = await this.userRepo.findById(id);
     if (!existing) {
       throw new NotFoundException("User not found");
     }
 
-    await this.userRepository.delete(id);
+    await this.userRepo.delete(id);
   }
 
   /**
    * List all users
    */
   async list(limit: number = 50, offset: number = 0): Promise<Omit<User, "passwordHash">[]> {
-    const users = await this.userRepository.list(limit, offset);
+    const users = await this.userRepo.list(limit, offset);
     return users.map(({ passwordHash: _unused, ...user }) => user);
   }
 }
