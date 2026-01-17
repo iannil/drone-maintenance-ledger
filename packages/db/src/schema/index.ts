@@ -24,3 +24,6 @@ export * from "./maintenance/work-order-part";
 export * from "./flight/flight-log";
 export * from "./flight/pilot-report";
 export * from "./flight/release-record";
+
+// Inventory & Supply Chain
+export * from "./inventory";
