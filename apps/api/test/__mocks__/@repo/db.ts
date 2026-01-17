@@ -338,3 +338,87 @@ export type Warehouse = {
   location: string | null;
   createdAt: number;
 };
+
+// Movement type enum
+export const MovementTypeEnum = {
+  RECEIPT: 'RECEIPT',
+  ISSUE: 'ISSUE',
+  TRANSFER: 'TRANSFER',
+  ADJUSTMENT: 'ADJUSTMENT',
+  RETURN: 'RETURN',
+  SCRAP: 'SCRAP',
+  COUNT: 'COUNT',
+} as const;
+
+export type MovementType = (typeof MovementTypeEnum)[keyof typeof MovementTypeEnum];
+
+// Movement status enum
+export const MovementStatusEnum = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export type MovementStatus = (typeof MovementStatusEnum)[keyof typeof MovementStatusEnum];
+
+// Inventory item type (full)
+export type InventoryItemFull = {
+  id: string;
+  partNumber: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  unit: string;
+  warehouseId: string | null;
+  location: string | null;
+  binNumber: string | null;
+  quantity: number;
+  reservedQuantity: number;
+  availableQuantity: number;
+  minStock: number | null;
+  maxStock: number | null;
+  reorderPoint: number | null;
+  reorderQuantity: number | null;
+  unitCost: number | null;
+  totalValue: number | null;
+  batchNumber: string | null;
+  serialNumbers: string | null;
+  expiryDate: number | null;
+  status: string;
+  lastCountDate: number | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+// Inventory movement type
+export type InventoryMovement = {
+  id: string;
+  movementNumber: string;
+  type: string;
+  status: string;
+  inventoryItemId: string | null;
+  partNumber: string;
+  partName: string | null;
+  quantity: number;
+  unit: string;
+  fromWarehouseId: string | null;
+  toWarehouseId: string | null;
+  fromLocation: string | null;
+  toLocation: string | null;
+  referenceType: string | null;
+  referenceId: string | null;
+  referenceNumber: string | null;
+  unitCost: number | null;
+  totalCost: number | null;
+  batchNumber: string | null;
+  serialNumbers: string | null;
+  reason: string | null;
+  notes: string | null;
+  requestedBy: string | null;
+  approvedBy: string | null;
+  approvedAt: number | null;
+  movementDate: number;
+  createdAt: number;
+  updatedAt: number;
+};
