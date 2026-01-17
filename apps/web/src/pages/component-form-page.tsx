@@ -362,7 +362,7 @@ export function ComponentFormPage() {
                             <SelectItem key={aircraft.id} value={aircraft.id}>
                               <div className="flex items-center gap-2">
                                 <span>{aircraft.registration}</span>
-                                <AircraftStatusBadge status={aircraft.status} />
+                                <AircraftStatusBadge status={aircraft.status as "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED"} />
                               </div>
                             </SelectItem>
                           ))}

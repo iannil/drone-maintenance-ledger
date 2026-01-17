@@ -360,7 +360,7 @@ interface BOMNode {
 
 export function ComponentBomPage() {
   const { aircraftId } = useParams<{ aircraftId: string }>();
-  const [bomData, setBomData] = useState(MOCK_AIRCRAFT_BOM);
+  const [bomData, setBomData] = useState<{ id: string; aircraftId: string; aircraft: { registration: string; model: string; serialNumber: string }; version: string; lastUpdated: string; tree: BOMNode[] }>(MOCK_AIRCRAFT_BOM as any);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [showLlpOnly, setShowLlpOnly] = useState(false);
@@ -387,8 +387,8 @@ export function ComponentBomPage() {
     const expandAllRecursive = (nodes: BOMNode[]): BOMNode[] => {
       return nodes.map((node) => ({
         ...node,
-        isExpanded: node.isExpandable ? true : undefined,
-        children: node.children ? expandAllRecursive(node.children) : undefined,
+        isExpanded: node.isExpandable ? true : node.isExpanded,
+        children: node.children ? expandAllRecursive(node.children) : node.children,
       }));
     };
     setBomData({
@@ -401,8 +401,8 @@ export function ComponentBomPage() {
     const collapseAllRecursive = (nodes: BOMNode[]): BOMNode[] => {
       return nodes.map((node) => ({
         ...node,
-        isExpanded: false,
-        children: node.children ? collapseAllRecursive(node.children) : undefined,
+        isExpanded: node.isExpandable ? false : node.isExpanded,
+        children: node.children ? collapseAllRecursive(node.children) : node.children,
       }));
     };
     setBomData({
@@ -615,7 +615,7 @@ export function ComponentBomPage() {
                             <Package className="w-4 h-4 text-slate-400" />
                             <span className="text-slate-900">{node.name}</span>
                             {node.isLlp && (
-                              <AlertTriangle className="w-3 h-3 text-orange-500" title="寿命件" />
+                              <span title="寿命件"><AlertTriangle className="w-3 h-3 text-orange-500" /></span>
                             )}
                           </div>
                         )}

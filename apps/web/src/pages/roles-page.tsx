@@ -423,7 +423,7 @@ export function RolesPage() {
                             {module.name}
                           </Label>
                           <Badge variant="outline" className="text-xs">
-                            {module.permissions.filter((p) => isPermissionEnabled(p.id))}/{module.permissions.length}
+                            {module.permissions.filter((p) => isPermissionEnabled(p.id)).length}/{module.permissions.length}
                           </Badge>
                         </div>
                         {partiallyEnabled && !fullyEnabled && (

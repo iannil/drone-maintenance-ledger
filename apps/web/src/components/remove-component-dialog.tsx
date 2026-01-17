@@ -1,13 +1,13 @@
 import { useState } from "react";
 import {
-  WrenchOff,
+  Wrench,
   Save,
   X,
   User,
   Calendar,
   FileText,
   AlertTriangle,
-  ArrowRightFromLeft,
+  ArrowRightFromLine,
 } from "lucide-react";
 
 import { Button } from "./ui/button";
@@ -146,7 +146,7 @@ export function RemoveComponentDialog({
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100">
-              <WrenchOff className="h-4 w-4 text-orange-600" />
+              <Wrench className="h-4 w-4 text-orange-600" />
             </div>
             <DialogTitle>零部件拆下</DialogTitle>
           </div>
@@ -162,7 +162,7 @@ export function RemoveComponentDialog({
             {/* Component Info */}
             <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100">
-                <ArrowRightFromLeft className="h-5 w-5 text-indigo-600" />
+                <ArrowRightFromLine className="h-5 w-5 text-indigo-600" />
               </div>
               <div className="flex-1">
                 <p className="font-medium text-slate-900">{component.name}</p>

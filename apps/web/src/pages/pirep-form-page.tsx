@@ -72,7 +72,7 @@ const MOCK_AIRCRAFT = [
   { id: "ac-001", registration: "B-7011U", model: "DJI M350 RTK", status: "SERVICEABLE", totalFlightHours: 125.5 },
   { id: "ac-002", registration: "B-7012U", model: "DJI M350 RTK", status: "SERVICEABLE", totalFlightHours: 89.3 },
   { id: "ac-003", registration: "B-7013U", model: "DJI M300 RTK", status: "MAINTENANCE", totalFlightHours: 210.8 },
-  { id: "ac-004", registration: "B-7021U", model: "DJI Mavic 3E", model: "DJI Mavic 3E", status: "GROUNDED", totalFlightHours: 45.2 },
+  { id: "ac-004", registration: "B-7021U", model: "DJI Mavic 3E", status: "GROUNDED", totalFlightHours: 45.2 },
 ];
 
 // Mock pilots
@@ -306,7 +306,7 @@ export function PirepFormPage() {
                             <span className="text-muted-foreground">·</span>
                             <span className="text-sm">{aircraft.model}</span>
                             <span className="text-muted-foreground">·</span>
-                            <AircraftStatusBadge status={aircraft.status} />
+                            <AircraftStatusBadge status={aircraft.status as "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED"} />
                           </div>
                         </SelectItem>
                       ))}
@@ -342,7 +342,7 @@ export function PirepFormPage() {
                 <div className="p-3 bg-slate-50 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium">{selectedAircraft.registration}</span>
-                    <AircraftStatusBadge status={selectedAircraft.status} />
+                    <AircraftStatusBadge status={selectedAircraft.status as "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED"} />
                   </div>
                   <div className="text-xs text-muted-foreground">
                     型号: {selectedAircraft.model} · 总飞行小时: {selectedAircraft.totalFlightHours}h

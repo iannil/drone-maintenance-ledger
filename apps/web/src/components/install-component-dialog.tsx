@@ -183,7 +183,7 @@ export function InstallComponentDialog({
                         <span className="text-xs text-slate-500">
                           {aircraft.model}
                         </span>
-                        <AircraftStatusBadge status={aircraft.status} />
+                        <AircraftStatusBadge status={aircraft.status as "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED"} />
                       </div>
                     </SelectItem>
                   ))}

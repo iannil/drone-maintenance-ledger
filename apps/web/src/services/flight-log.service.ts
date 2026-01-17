@@ -106,7 +106,7 @@ export const flightLogService = {
     offset?: number;
     aircraftId?: string;
     pilotId?: string;
-    recent?: boolean;
+    recent?: string;
     startDate?: string;
     endDate?: string;
   }): Promise<FlightLog[]> {
