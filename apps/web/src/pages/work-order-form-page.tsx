@@ -501,7 +501,7 @@ export function WorkOrderFormPage() {
                           <span className="text-muted-foreground">·</span>
                           <span className="text-sm">{aircraft.model}</span>
                           <span className="text-muted-foreground">·</span>
-                          <AircraftStatusBadge status={aircraft.status} />
+                          <AircraftStatusBadge status={aircraft.status as "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED"} />
                         </div>
                       </SelectItem>
                     ))}
@@ -516,7 +516,7 @@ export function WorkOrderFormPage() {
                   <div className="mt-3 p-3 bg-slate-50 rounded-lg space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">{selectedAircraft.registration}</span>
-                      <AircraftStatusBadge status={selectedAircraft.status} />
+                      <AircraftStatusBadge status={selectedAircraft.status as "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED"} />
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                       <div>

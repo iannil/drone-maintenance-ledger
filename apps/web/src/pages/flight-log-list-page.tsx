@@ -76,7 +76,7 @@ export function FlightLogListPage() {
   const filteredLogs = flightLogs.filter((log) => {
     const aircraft = aircraftMap.get(log.aircraftId);
     const matchesSearch =
-      aircraft?.registration
+      aircraft?.registrationNumber
         ?.toLowerCase()
         .includes(searchQuery.toLowerCase()) ||
       log.departureLocation?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -261,7 +261,7 @@ export function FlightLogListPage() {
               <option value="all">全部飞机</option>
               {aircraftList.map((ac) => (
                 <option key={ac.id} value={ac.id}>
-                  {ac.registration}
+                  {ac.registrationNumber}
                 </option>
               ))}
             </select>
@@ -324,7 +324,7 @@ export function FlightLogListPage() {
                             to={`/aircraft/${log.aircraftId}`}
                             className="text-sm font-medium text-primary hover:underline"
                           >
-                            {aircraft.registration}
+                            {aircraft.registrationNumber}
                           </Link>
                         ) : (
                           <span className="text-sm text-muted-foreground">

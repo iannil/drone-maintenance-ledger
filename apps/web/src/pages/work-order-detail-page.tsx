@@ -338,7 +338,7 @@ export function WorkOrderDetailPage() {
                   to={`/aircraft/${workOrder.aircraftId}`}
                   className="font-medium text-primary hover:underline"
                 >
-                  {aircraft.registration}
+                  {aircraft.registrationNumber}
                 </Link>
                 <p className="text-xs text-muted-foreground">{aircraft.model}</p>
               </>

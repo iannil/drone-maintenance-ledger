@@ -1,19 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle,
   Package,
-  TrendingDown,
   AlertCircle,
   CheckCircle2,
   Search,
-  Filter,
   Bell,
-  BellOff,
   Download,
   ArrowUp,
   ArrowDown,
   Warehouse,
+  Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -26,13 +24,6 @@ import {
 } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -41,8 +32,9 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { Label } from "../components/ui/label";
+import { inventoryService, InventoryItem, InventoryAlerts } from "../services/inventory.service";
 
-// 预警级别
+// Alert level configuration
 const ALERT_LEVELS = {
   CRITICAL: {
     label: "严重",
@@ -62,252 +54,156 @@ const ALERT_LEVELS = {
     icon: Bell,
     description: "接近预警线，请关注",
   },
-  NORMAL: {
-    label: "正常",
-    color: "bg-green-100 text-green-700 border-green-200",
-    icon: CheckCircle2,
-    description: "库存充足",
-  },
 };
 
-// 预警类型
+// Alert type configuration
 const ALERT_TYPES = {
   LOW_STOCK: { label: "库存不足", color: "bg-red-50 text-red-700" },
-  OVERSTOCK: { label: "库存过剩", color: "bg-blue-50 text-blue-700" },
   EXPIRING: { label: "即将过期", color: "bg-orange-50 text-orange-700" },
-  EXPIRED: { label: "已过期", color: "bg-red-50 text-red-700" },
-  SLOW_MOVING: { label: "周转缓慢", color: "bg-yellow-50 text-yellow-700" },
 };
 
+// Transform inventory item to alert format
+interface AlertItem {
+  id: string;
+  partNumber: string;
+  name: string;
+  description: string | null;
+  currentStock: number;
+  minStock: number;
+  maxStock: number | null;
+  reorderPoint: number;
+  reorderQuantity: number;
+  unit: string;
+  level: "CRITICAL" | "WARNING" | "INFO";
+  type: "LOW_STOCK" | "EXPIRING";
+  location: string | null;
+  expiryDate: number | null;
+  unitCost: number | null;
+}
+
+function transformToAlert(item: InventoryItem, type: "LOW_STOCK" | "EXPIRING"): AlertItem {
+  let level: "CRITICAL" | "WARNING" | "INFO";
+
+  if (type === "LOW_STOCK") {
+    if (item.availableQuantity === 0) {
+      level = "CRITICAL";
+    } else if (item.availableQuantity <= item.minStock * 0.5) {
+      level = "CRITICAL";
+    } else if (item.availableQuantity <= item.minStock) {
+      level = "WARNING";
+    } else {
+      level = "INFO";
+    }
+  } else {
+    // Expiring items
+    if (item.expiryDate) {
+      const daysUntilExpiry = Math.ceil((item.expiryDate - Date.now()) / (1000 * 60 * 60 * 24));
+      if (daysUntilExpiry <= 7) {
+        level = "CRITICAL";
+      } else if (daysUntilExpiry <= 14) {
+        level = "WARNING";
+      } else {
+        level = "INFO";
+      }
+    } else {
+      level = "INFO";
+    }
+  }
+
+  return {
+    id: item.id,
+    partNumber: item.partNumber,
+    name: item.name,
+    description: item.description,
+    currentStock: item.availableQuantity,
+    minStock: item.minStock,
+    maxStock: item.maxStock,
+    reorderPoint: item.reorderPoint,
+    reorderQuantity: item.reorderQuantity,
+    unit: item.unit,
+    level,
+    type,
+    location: item.location || item.binNumber,
+    expiryDate: item.expiryDate,
+    unitCost: item.unitCost,
+  };
+}
+
 /**
- * 零部件库存预警页面
+ * Inventory alerts page
  */
 export function InventoryAlertsPage() {
+  // Data state
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+
+  // Dialog state
   const [showDetailDialog, setShowDetailDialog] = useState(false);
-  const [selectedAlert, setSelectedAlert] = useState<any>(null);
+  const [selectedAlert, setSelectedAlert] = useState<AlertItem | null>(null);
 
-  // 预警数据
-  const inventoryAlerts = [
-    {
-      id: "alert-001",
-      partId: "part-001",
-      partNumber: "EM-2814-001",
-      partName: "电机 AX-2814",
-      specification: "380KV",
-      currentStock: 2,
-      minStock: 5,
-      maxStock: 20,
-      reorderPoint: 5,
-      reorderQuantity: 10,
-      unit: "个",
-      level: "CRITICAL",
-      type: "LOW_STOCK",
-      location: "仓库A-01",
-      lastPurchase: "2025-12-15",
-      lastUsage: "2026-01-14",
-      avgMonthlyUsage: 8,
-      trend: "down",
-      trendValue: -15,
-      suggestedAction: "立即采购",
-      suppliers: ["供应商A", "供应商B"],
-    },
-    {
-      id: "alert-002",
-      partId: "part-002",
-      partNumber: "PR-2995-002",
-      partName: "螺旋桨 29x9.5",
-      specification: "碳纤维",
-      currentStock: 6,
-      minStock: 8,
-      maxStock: 30,
-      reorderPoint: 8,
-      reorderQuantity: 15,
-      unit: "片",
-      level: "WARNING",
-      type: "LOW_STOCK",
-      location: "仓库A-02",
-      lastPurchase: "2025-12-20",
-      lastUsage: "2026-01-15",
-      avgMonthlyUsage: 12,
-      trend: "down",
-      trendValue: -8,
-      suggestedAction: "建议补货",
-      suppliers: ["供应商C"],
-    },
-    {
-      id: "alert-003",
-      partId: "part-003",
-      partNumber: "BT-16000-001",
-      partName: "电池包 16000mAh",
-      specification: "LiPo 6S",
-      currentStock: 0,
-      minStock: 4,
-      maxStock: 12,
-      reorderPoint: 4,
-      reorderQuantity: 6,
-      unit: "个",
-      level: "CRITICAL",
-      type: "LOW_STOCK",
-      location: "电池房",
-      lastPurchase: "2025-12-10",
-      lastUsage: "2026-01-15",
-      avgMonthlyUsage: 6,
-      trend: "down",
-      trendValue: -20,
-      suggestedAction: "紧急采购",
-      suppliers: ["供应商A", "供应商D"],
-    },
-    {
-      id: "alert-004",
-      partId: "part-004",
-      partNumber: "ES-40A-003",
-      partName: "电调 40A",
-      specification: "BLHeli-S",
-      currentStock: 35,
-      minStock: 4,
-      maxStock: 15,
-      reorderPoint: 5,
-      reorderQuantity: 10,
-      unit: "个",
-      level: "WARNING",
-      type: "OVERSTOCK",
-      location: "仓库B-01",
-      lastPurchase: "2025-11-15",
-      lastUsage: "2026-01-10",
-      avgMonthlyUsage: 3,
-      trend: "up",
-      trendValue: 200,
-      suggestedAction: "控制采购",
-      suppliers: ["供应商B"],
-    },
-    {
-      id: "alert-005",
-      partId: "part-005",
-      partNumber: "GPS-MODULE-004",
-      partName: "GPS模块",
-      specification: "M8N",
-      currentStock: 3,
-      minStock: 3,
-      maxStock: 10,
-      reorderPoint: 4,
-      reorderQuantity: 5,
-      unit: "个",
-      level: "INFO",
-      type: "LOW_STOCK",
-      location: "电子仓",
-      lastPurchase: "2026-01-05",
-      lastUsage: "2026-01-12",
-      avgMonthlyUsage: 4,
-      trend: "down",
-      trendValue: -5,
-      suggestedAction: "关注库存",
-      suppliers: ["供应商E"],
-    },
-    {
-      id: "alert-006",
-      partId: "part-006",
-      partNumber: "LG-FRONT-005",
-      partName: "起落架前",
-      specification: "折叠式",
-      currentStock: 8,
-      minStock: 2,
-      maxStock: 8,
-      reorderPoint: 3,
-      reorderQuantity: 5,
-      unit: "个",
-      level: "WARNING",
-      type: "SLOW_MOVING",
-      location: "仓库B-03",
-      lastPurchase: "2025-08-20",
-      lastUsage: "2025-12-01",
-      avgMonthlyUsage: 0.5,
-      trend: "flat",
-      trendValue: 0,
-      suggestedAction: "减少备货",
-      suppliers: ["供应商F"],
-    },
-    {
-      id: "alert-007",
-      partId: "part-007",
-      partNumber: "FC-V3-006",
-      partName: "飞控控制器 V3",
-      specification: "Pixhawk 6C",
-      currentStock: 2,
-      minStock: 2,
-      maxStock: 6,
-      reorderPoint: 3,
-      reorderQuantity: 3,
-      unit: "个",
-      level: "INFO",
-      type: "LOW_STOCK",
-      location: "电子仓",
-      lastPurchase: "2025-11-10",
-      lastUsage: "2026-01-08",
-      avgMonthlyUsage: 2,
-      trend: "down",
-      trendValue: -10,
-      suggestedAction: "关注库存",
-      suppliers: ["供应商G"],
-    },
-    {
-      id: "alert-008",
-      partId: "part-008",
-      partNumber: "CABLE-XT90-007",
-      partName: "XT90连接线",
-      specification: "12AWG",
-      currentStock: 50,
-      minStock: 10,
-      maxStock: 30,
-      reorderPoint: 15,
-      reorderQuantity: 20,
-      unit: "根",
-      level: "WARNING",
-      type: "OVERSTOCK",
-      location: "配件区",
-      lastPurchase: "2025-10-05",
-      lastUsage: "2026-01-14",
-      avgMonthlyUsage: 8,
-      trend: "up",
-      trendValue: 150,
-      suggestedAction: "暂停采购",
-      suppliers: ["供应商H"],
-    },
-  ];
+  // Load alerts
+  useEffect(() => {
+    loadAlerts();
+  }, []);
 
-  // 筛选预警
-  const filteredAlerts = inventoryAlerts.filter((alert) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      alert.partName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      alert.partNumber.toLowerCase().includes(searchQuery.toLowerCase());
+  const loadAlerts = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data: InventoryAlerts = await inventoryService.getAlerts();
+      const alertItems: AlertItem[] = [
+        ...data.lowStock.map((item) => transformToAlert(item, "LOW_STOCK")),
+        ...data.expiring.map((item) => transformToAlert(item, "EXPIRING")),
+      ];
+      setAlerts(alertItems);
+    } catch (err) {
+      console.error("Failed to load alerts:", err);
+      setError("加载预警数据失败");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    const matchesLevel = levelFilter === "all" || alert.level === levelFilter;
-    const matchesType = typeFilter === "all" || alert.type === typeFilter;
+  // Filter alerts
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter((alert) => {
+      const matchesSearch =
+        searchQuery === "" ||
+        alert.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        alert.partNumber.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return matchesSearch && matchesLevel && matchesType;
-  });
+      const matchesLevel = levelFilter === "all" || alert.level === levelFilter;
+      const matchesType = typeFilter === "all" || alert.type === typeFilter;
 
-  // 统计
-  const stats = {
+      return matchesSearch && matchesLevel && matchesType;
+    });
+  }, [alerts, searchQuery, levelFilter, typeFilter]);
+
+  // Statistics
+  const stats = useMemo(() => ({
     total: filteredAlerts.length,
     critical: filteredAlerts.filter((a) => a.level === "CRITICAL").length,
     warning: filteredAlerts.filter((a) => a.level === "WARNING").length,
     info: filteredAlerts.filter((a) => a.level === "INFO").length,
-  };
+  }), [filteredAlerts]);
 
-  // 查看详情
-  const viewDetail = (alert: typeof inventoryAlerts[0]) => {
+  // View detail
+  const viewDetail = (alert: AlertItem) => {
     setSelectedAlert(alert);
     setShowDetailDialog(true);
   };
 
-  // 库存进度条
-  const StockProgressBar = ({ current, min, max }: { current: number; min: number; max: number }) => {
-    const percentage = Math.min((current / max) * 100, 100);
-    const minPercentage = (min / max) * 100;
+  // Stock progress bar
+  const StockProgressBar = ({ current, min, max }: { current: number; min: number; max: number | null }) => {
+    const maxVal = max || min * 3;
+    const percentage = Math.min((current / maxVal) * 100, 100);
+    const minPercentage = (min / maxVal) * 100;
 
     return (
       <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -317,6 +213,7 @@ export function InventoryAlertsPage() {
         />
         <div
           className={`absolute h-full rounded-full ${
+            current === 0 ? "bg-red-500" :
             current < min ? "bg-red-500" :
             current < min * 1.5 ? "bg-orange-500" :
             "bg-green-500"
@@ -327,29 +224,19 @@ export function InventoryAlertsPage() {
     );
   };
 
-  // 趋势指示器
-  const TrendIndicator = ({ trend, value }: { trend: string; value: number }) => {
-    if (trend === "up") {
-      return (
-        <span className="flex items-center text-green-600 text-xs">
-          <ArrowUp className="h-3 w-3 mr-1" />
-          {value > 0 ? `+${value}%` : "0%"}
-        </span>
-      );
-    } else if (trend === "down") {
-      return (
-        <span className="flex items-center text-red-600 text-xs">
-          <ArrowDown className="h-3 w-3 mr-1" />
-          {value}%
-        </span>
-      );
-    }
+  if (error) {
     return (
-      <span className="flex items-center text-muted-foreground text-xs">
-        持平
-      </span>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-lg font-medium text-slate-900">{error}</p>
+          <Button className="mt-4" onClick={loadAlerts}>
+            重试
+          </Button>
+        </div>
+      </div>
     );
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -362,6 +249,10 @@ export function InventoryAlertsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={loadAlerts} disabled={isLoading}>
+            {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+            刷新
+          </Button>
           <Button variant="outline">
             <Download className="w-4 h-4 mr-2" />
             导出报告
@@ -379,7 +270,11 @@ export function InventoryAlertsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-2xl font-bold">{stats.total}</div>
+            )}
           </CardContent>
         </Card>
         <Card className="border-red-200">
@@ -390,7 +285,11 @@ export function InventoryAlertsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.critical}</div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-2xl font-bold text-red-600">{stats.critical}</div>
+            )}
           </CardContent>
         </Card>
         <Card className="border-orange-200">
@@ -401,7 +300,11 @@ export function InventoryAlertsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats.warning}</div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-2xl font-bold text-orange-600">{stats.warning}</div>
+            )}
           </CardContent>
         </Card>
         <Card className="border-yellow-200">
@@ -412,7 +315,11 @@ export function InventoryAlertsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.info}</div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-2xl font-bold text-yellow-600">{stats.info}</div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -490,105 +397,117 @@ export function InventoryAlertsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {filteredAlerts.map((alert) => {
-              const LevelIcon = ALERT_LEVELS[alert.level as keyof typeof ALERT_LEVELS].icon;
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredAlerts.map((alert) => {
+                const levelConfig = ALERT_LEVELS[alert.level];
+                const LevelIcon = levelConfig.icon;
+                const typeConfig = ALERT_TYPES[alert.type];
 
-              return (
-                <div
-                  key={alert.id}
-                  className={`border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer ${
-                    alert.level === "CRITICAL" ? "border-red-200 bg-red-50/30" :
-                    alert.level === "WARNING" ? "border-orange-200 bg-orange-50/30" :
-                    ""
-                  }`}
-                  onClick={() => viewDetail(alert)}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-4 flex-1">
-                      {/* Level Icon */}
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                        alert.level === "CRITICAL" ? "bg-red-100" :
-                        alert.level === "WARNING" ? "bg-orange-100" :
-                        "bg-yellow-100"
-                      }`}>
-                        <LevelIcon className={`h-5 w-5 ${
-                          alert.level === "CRITICAL" ? "text-red-600" :
-                          alert.level === "WARNING" ? "text-orange-600" :
-                          "text-yellow-600"
-                        }`} />
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <Link
-                            to={`/inventory`}
-                            className="font-medium hover:text-primary"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {alert.partName}
-                          </Link>
-                          <span className="text-sm text-muted-foreground">
-                            ({alert.partNumber})
-                          </span>
-                          <Badge className={ALERT_LEVELS[alert.level as keyof typeof ALERT_LEVELS].color}>
-                            {ALERT_LEVELS[alert.level as keyof typeof ALERT_LEVELS].label}
-                          </Badge>
-                          <Badge className={ALERT_TYPES[alert.type as keyof typeof ALERT_TYPES].color}>
-                            {ALERT_TYPES[alert.type as keyof typeof ALERT_TYPES].label}
-                          </Badge>
+                return (
+                  <div
+                    key={`${alert.id}-${alert.type}`}
+                    className={`border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer ${
+                      alert.level === "CRITICAL" ? "border-red-200 bg-red-50/30" :
+                      alert.level === "WARNING" ? "border-orange-200 bg-orange-50/30" :
+                      ""
+                    }`}
+                    onClick={() => viewDetail(alert)}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4 flex-1">
+                        {/* Level Icon */}
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                          alert.level === "CRITICAL" ? "bg-red-100" :
+                          alert.level === "WARNING" ? "bg-orange-100" :
+                          "bg-yellow-100"
+                        }`}>
+                          <LevelIcon className={`h-5 w-5 ${
+                            alert.level === "CRITICAL" ? "text-red-600" :
+                            alert.level === "WARNING" ? "text-orange-600" :
+                            "text-yellow-600"
+                          }`} />
                         </div>
 
-                        <p className="text-sm text-muted-foreground mb-2">
-                          规格: {alert.specification} | 位置: {alert.location}
-                        </p>
-
-                        {/* Stock Progress */}
-                        <div className="mb-2">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                            <span>库存: {alert.currentStock} / {alert.maxStock} {alert.unit}</span>
-                            <span>最小: {alert.minStock} {alert.unit}</span>
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <Link
+                              to={`/inventory`}
+                              className="font-medium hover:text-primary"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {alert.name}
+                            </Link>
+                            <span className="text-sm text-muted-foreground">
+                              ({alert.partNumber})
+                            </span>
+                            <Badge className={levelConfig.color}>
+                              {levelConfig.label}
+                            </Badge>
+                            <Badge className={typeConfig.color}>
+                              {typeConfig.label}
+                            </Badge>
                           </div>
-                          <StockProgressBar
-                            current={alert.currentStock}
-                            min={alert.minStock}
-                            max={alert.maxStock}
-                          />
-                        </div>
 
-                        {/* Details */}
-                        <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            月均用量: {alert.avgMonthlyUsage} {alert.unit}
-                          </span>
-                          <TrendIndicator trend={alert.trend} value={alert.trendValue} />
-                          <span className="flex items-center gap-1">
-                            建议操作: <span className={`font-medium ${
-                              alert.level === "CRITICAL" ? "text-red-600" :
-                              alert.level === "WARNING" ? "text-orange-600" :
-                              "text-yellow-600"
-                            }`}>{alert.suggestedAction}</span>
-                          </span>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            {alert.description || "无描述"} | 位置: {alert.location || "未指定"}
+                          </p>
+
+                          {/* Stock Progress */}
+                          <div className="mb-2">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                              <span>库存: {alert.currentStock} / {alert.maxStock || alert.minStock * 3} {alert.unit}</span>
+                              <span>最小: {alert.minStock} {alert.unit}</span>
+                            </div>
+                            <StockProgressBar
+                              current={alert.currentStock}
+                              min={alert.minStock}
+                              max={alert.maxStock}
+                            />
+                          </div>
+
+                          {/* Details */}
+                          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                            <span>
+                              建议操作: <span className={`font-medium ${
+                                alert.level === "CRITICAL" ? "text-red-600" :
+                                alert.level === "WARNING" ? "text-orange-600" :
+                                "text-yellow-600"
+                              }`}>
+                                {alert.level === "CRITICAL" ? "立即采购" :
+                                 alert.level === "WARNING" ? "建议补货" : "关注库存"}
+                              </span>
+                            </span>
+                            {alert.type === "EXPIRING" && alert.expiryDate && (
+                              <span>
+                                过期时间: {new Date(alert.expiryDate).toLocaleDateString("zh-CN")}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Quick Actions */}
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground mb-1">建议采购</p>
-                      <p className="text-lg font-bold">{alert.reorderQuantity} {alert.unit}</p>
+                      {/* Quick Actions */}
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground mb-1">建议采购</p>
+                        <p className="text-lg font-bold">{alert.reorderQuantity} {alert.unit}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Empty State */}
-          {filteredAlerts.length === 0 && (
+          {!isLoading && filteredAlerts.length === 0 && (
             <div className="text-center py-12">
-              <Package className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <CheckCircle2 className="w-12 h-12 mx-auto mb-4 text-green-500 opacity-50" />
               <h3 className="text-lg font-semibold mb-2">暂无预警</h3>
               <p className="text-muted-foreground">
                 所有零部件库存状态正常
@@ -604,7 +523,7 @@ export function InventoryAlertsPage() {
           <DialogHeader>
             <DialogTitle>库存预警详情</DialogTitle>
             <DialogDescription>
-              {selectedAlert?.partName}
+              {selectedAlert?.name}
             </DialogDescription>
           </DialogHeader>
           {selectedAlert && (
@@ -615,8 +534,8 @@ export function InventoryAlertsPage() {
                   <p className="font-medium">{selectedAlert.partNumber}</p>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">规格</Label>
-                  <p className="font-medium">{selectedAlert.specification}</p>
+                  <Label className="text-muted-foreground">描述</Label>
+                  <p className="font-medium">{selectedAlert.description || "-"}</p>
                 </div>
               </div>
               <div className="grid grid-cols-4 gap-4">
@@ -630,7 +549,7 @@ export function InventoryAlertsPage() {
                 </div>
                 <div>
                   <Label className="text-muted-foreground">最大库存</Label>
-                  <p className="font-medium">{selectedAlert.maxStock} {selectedAlert.unit}</p>
+                  <p className="font-medium">{selectedAlert.maxStock || "-"} {selectedAlert.unit}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">补货点</Label>
@@ -644,20 +563,22 @@ export function InventoryAlertsPage() {
                     <Label className="text-muted-foreground">存放位置</Label>
                     <p className="font-medium flex items-center gap-1">
                       <Warehouse className="h-3.5 w-3.5" />
-                      {selectedAlert.location}
+                      {selectedAlert.location || "未指定"}
                     </p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">预警级别</Label>
                     <p className="font-medium">
-                      <Badge className={ALERT_LEVELS[selectedAlert.level as keyof typeof ALERT_LEVELS].color}>
-                        {ALERT_LEVELS[selectedAlert.level as keyof typeof ALERT_LEVELS].label}
+                      <Badge className={ALERT_LEVELS[selectedAlert.level].color}>
+                        {ALERT_LEVELS[selectedAlert.level].label}
                       </Badge>
                     </p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">月均用量</Label>
-                    <p className="font-medium">{selectedAlert.avgMonthlyUsage} {selectedAlert.unit}/月</p>
+                    <Label className="text-muted-foreground">单价</Label>
+                    <p className="font-medium">
+                      {selectedAlert.unitCost ? `¥${selectedAlert.unitCost.toLocaleString()}` : "-"}
+                    </p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">建议补货量</Label>
@@ -665,18 +586,14 @@ export function InventoryAlertsPage() {
                   </div>
                 </div>
               </div>
-              <div className="border-t pt-4">
-                <h4 className="font-medium mb-3">操作建议</h4>
-                <p className="text-sm">{selectedAlert.suggestedAction}</p>
-                <div className="mt-2">
-                  <Label className="text-muted-foreground">供应商</Label>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {selectedAlert.suppliers.map((supplier: string, index: number) => (
-                      <Badge key={index} variant="outline">{supplier}</Badge>
-                    ))}
-                  </div>
+              {selectedAlert.type === "EXPIRING" && selectedAlert.expiryDate && (
+                <div className="border-t pt-4">
+                  <h4 className="font-medium mb-3">过期信息</h4>
+                  <p className="text-sm">
+                    过期日期: {new Date(selectedAlert.expiryDate).toLocaleDateString("zh-CN")}
+                  </p>
                 </div>
-              </div>
+              )}
             </div>
           )}
           <DialogFooter>

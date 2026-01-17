@@ -1,8 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Package,
   Search,
-  Filter,
   Plus,
   Edit2,
   AlertTriangle,
@@ -12,9 +11,8 @@ import {
   Download,
   Upload,
   QrCode,
-  Eye,
+  Loader2,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
@@ -40,163 +38,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
+import {
+  inventoryService,
+  InventoryItem,
+  AdjustInventoryDto,
+} from "../services/inventory.service";
 
-// Mock inventory data
-const MOCK_INVENTORY = [
-  {
-    id: "inv-001",
-    partId: "part-001",
-    partNumber: "MOTOR-350-01",
-    partName: "电机组件",
-    category: "动力系统",
-    manufacturer: "DJI",
-    specifications: { voltage: "48V", maxCurrent: "30A", weight: "280g" },
-    unit: "个",
-    totalQuantity: 8,
-    availableQuantity: 5,
-    reservedQuantity: 2,
-    minimumStock: 3,
-    locations: [
-      { warehouse: "主仓库", area: "A区", position: "A-01-01", quantity: 3 },
-      { warehouse: "主仓库", area: "A区", position: "A-01-02", quantity: 2 },
-    ],
-    unitCost: 2800,
-    lastRestockDate: "2025-12-15",
-    lastRestockSupplier: "DJI官方授权",
-    compatibleAircraft: ["DJI M350 RTK", "DJI M300 RTK"],
-  },
-  {
-    id: "inv-002",
-    partId: "part-002",
-    partNumber: "PROP-350-21",
-    partName: "螺旋桨",
-    category: "动力系统",
-    manufacturer: "DJI",
-    specifications: { length: "21英寸", material: "碳纤维", weight: "45g" },
-    unit: "个",
-    totalQuantity: 48,
-    availableQuantity: 40,
-    reservedQuantity: 8,
-    minimumStock: 16,
-    locations: [
-      { warehouse: "主仓库", area: "B区", position: "B-03-01", quantity: 24 },
-      { warehouse: "主仓库", area: "B区", position: "B-03-02", quantity: 16 },
-      { warehouse: "备用仓库", area: "C区", position: "C-01-01", quantity: 8 },
-    ],
-    unitCost: 180,
-    lastRestockDate: "2025-12-20",
-    lastRestockSupplier: "DJI官方授权",
-    compatibleAircraft: ["DJI M350 RTK"],
-  },
-  {
-    id: "inv-003",
-    partId: "part-003",
-    partNumber: "BATT-TB65",
-    partName: "智能飞行电池 TB65",
-    category: "电源系统",
-    manufacturer: "DJI",
-    specifications: { capacity: "4920mAh", voltage: "51.8V", cells: 12 },
-    unit: "个",
-    totalQuantity: 15,
-    availableQuantity: 10,
-    reservedQuantity: 5,
-    minimumStock: 6,
-    locations: [
-      { warehouse: "主仓库", area: "C区", position: "C-01-01", quantity: 10 },
-      { warehouse: "备用仓库", area: "C区", position: "C-01-02", quantity: 5 },
-    ],
-    unitCost: 3200,
-    lastRestockDate: "2025-11-10",
-    lastRestockSupplier: "DJI官方授权",
-    compatibleAircraft: ["DJI M350 RTK"],
-  },
-  {
-    id: "inv-004",
-    partId: "part-004",
-    partNumber: "GPS-M300-01",
-    partName: "GPS模块",
-    category: "导航系统",
-    manufacturer: "DJI",
-    specifications: { gnss: "GPS+GLONASS+BeiDou", accuracy: "RTK 1cm+1ppm" },
-    unit: "个",
-    totalQuantity: 2,
-    availableQuantity: 0,
-    reservedQuantity: 2,
-    minimumStock: 2,
-    locations: [
-      { warehouse: "主仓库", area: "A区", position: "A-05-01", quantity: 0 },
-    ],
-    unitCost: 1500,
-    lastRestockDate: "2025-08-15",
-    lastRestockSupplier: "DJI官方授权",
-    compatibleAircraft: ["DJI M300 RTK", "DJI M350 RTK"],
-  },
-  {
-    id: "inv-005",
-    partId: "part-005",
-    partNumber: "FC-350-01",
-    partName: "主控板",
-    category: "控制系统",
-    manufacturer: "DJI",
-    specifications: { imu: "双IMU", processor: "ARM Cortex" },
-    unit: "个",
-    totalQuantity: 3,
-    availableQuantity: 1,
-    reservedQuantity: 2,
-    minimumStock: 1,
-    locations: [
-      { warehouse: "主仓库", area: "A区", position: "A-02-01", quantity: 1 },
-    ],
-    unitCost: 5800,
-    lastRestockDate: "2025-09-20",
-    lastRestockSupplier: "DJI官方授权",
-    compatibleAircraft: ["DJI M350 RTK"],
-  },
-  {
-    id: "inv-006",
-    partId: "part-006",
-    partNumber: "GIMBAL-Z30",
-    partName: "云台相机 Z30",
-    category: "任务载荷",
-    manufacturer: "DJI",
-    specifications: { zoom: "30x光学", sensor: "1/2.3\" CMOS", resolution: "4K" },
-    unit: "个",
-    totalQuantity: 4,
-    availableQuantity: 3,
-    reservedQuantity: 1,
-    minimumStock: 1,
-    locations: [
-      { warehouse: "主仓库", area: "D区", position: "D-01-01", quantity: 3 },
-    ],
-    unitCost: 12000,
-    lastRestockDate: "2025-10-05",
-    lastRestockSupplier: "DJI官方授权",
-    compatibleAircraft: ["DJI M300 RTK", "DJI M350 RTK"],
-  },
-  {
-    id: "inv-007",
-    partId: "part-007",
-    partNumber: "CABLE-PWR-EXT",
-    partName: "电源延长线",
-    category: "线缆配件",
-    manufacturer: "第三方",
-    specifications: { length: "30cm", gauge: "18AWG" },
-    unit: "根",
-    totalQuantity: 20,
-    availableQuantity: 18,
-    reservedQuantity: 2,
-    minimumStock: 5,
-    locations: [
-      { warehouse: "主仓库", area: "E区", position: "E-01-01", quantity: 20 },
-    ],
-    unitCost: 45,
-    lastRestockDate: "2025-12-01",
-    lastRestockSupplier: "配件供应商A",
-    compatibleAircraft: ["通用"],
-  },
-];
-
-type SortField = "partNumber" | "partName" | "availableQuantity" | "totalQuantity" | "unitCost";
+type SortField = "partNumber" | "name" | "availableQuantity" | "quantity" | "unitCost";
 type SortOrder = "asc" | "desc";
 type CategoryFilter = "all" | string;
 type StockFilter = "all" | "low" | "out" | "normal";
@@ -205,6 +53,11 @@ type StockFilter = "all" | "low" | "out" | "normal";
  * Inventory management page
  */
 export function InventoryPage() {
+  // Data state
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
@@ -215,18 +68,38 @@ export function InventoryPage() {
   // Dialog state
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [showAdjustDialog, setShowAdjustDialog] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<typeof MOCK_INVENTORY[0] | null>(null);
+  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [adjustment, setAdjustment] = useState({ type: "in" as "in" | "out", quantity: 1, reason: "" });
+  const [isAdjusting, setIsAdjusting] = useState(false);
+
+  // Load inventory data
+  useEffect(() => {
+    loadInventoryData();
+  }, []);
+
+  const loadInventoryData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await inventoryService.list({ limit: 500 });
+      setInventoryItems(response.data);
+    } catch (err) {
+      console.error("Failed to load inventory:", err);
+      setError("加载库存数据失败");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Get unique categories
   const categories = useMemo(() => {
-    const cats = new Set(MOCK_INVENTORY.map((item) => item.category));
-    return Array.from(cats);
-  }, []);
+    const cats = new Set(inventoryItems.map((item) => item.category).filter(Boolean));
+    return Array.from(cats) as string[];
+  }, [inventoryItems]);
 
   // Filter and sort inventory
   const filteredInventory = useMemo(() => {
-    let filtered = [...MOCK_INVENTORY];
+    let filtered = [...inventoryItems];
 
     // Search filter
     if (searchQuery) {
@@ -234,8 +107,7 @@ export function InventoryPage() {
       filtered = filtered.filter(
         (item) =>
           item.partNumber.toLowerCase().includes(query) ||
-          item.partName.toLowerCase().includes(query) ||
-          item.manufacturer.toLowerCase().includes(query)
+          item.name.toLowerCase().includes(query)
       );
     }
 
@@ -247,18 +119,18 @@ export function InventoryPage() {
     // Stock status filter
     if (stockFilter === "low") {
       filtered = filtered.filter(
-        (item) => item.availableQuantity > 0 && item.availableQuantity <= item.minimumStock
+        (item) => item.availableQuantity > 0 && item.availableQuantity <= item.minStock
       );
     } else if (stockFilter === "out") {
       filtered = filtered.filter((item) => item.availableQuantity === 0);
     } else if (stockFilter === "normal") {
-      filtered = filtered.filter((item) => item.availableQuantity > item.minimumStock);
+      filtered = filtered.filter((item) => item.availableQuantity > item.minStock);
     }
 
     // Sort
     filtered.sort((a, b) => {
-      let aVal = a[sortField];
-      let bVal = b[sortField];
+      let aVal: string | number = a[sortField] ?? "";
+      let bVal: string | number = b[sortField] ?? "";
 
       if (typeof aVal === "string") aVal = aVal.toLowerCase();
       if (typeof bVal === "string") bVal = bVal.toLowerCase();
@@ -269,24 +141,24 @@ export function InventoryPage() {
     });
 
     return filtered;
-  }, [searchQuery, categoryFilter, stockFilter, sortField, sortOrder]);
+  }, [inventoryItems, searchQuery, categoryFilter, stockFilter, sortField, sortOrder]);
 
   // Calculate statistics
   const stats = useMemo(() => {
-    const totalItems = MOCK_INVENTORY.length;
-    const lowStockItems = MOCK_INVENTORY.filter(
-      (item) => item.availableQuantity > 0 && item.availableQuantity <= item.minimumStock
+    const totalItems = inventoryItems.length;
+    const lowStockItems = inventoryItems.filter(
+      (item) => item.availableQuantity > 0 && item.availableQuantity <= item.minStock
     ).length;
-    const outOfStockItems = MOCK_INVENTORY.filter(
+    const outOfStockItems = inventoryItems.filter(
       (item) => item.availableQuantity === 0
     ).length;
-    const totalValue = MOCK_INVENTORY.reduce(
-      (sum, item) => sum + item.totalQuantity * item.unitCost,
+    const totalValue = inventoryItems.reduce(
+      (sum, item) => sum + (item.totalValue || 0),
       0
     );
 
     return { totalItems, lowStockItems, outOfStockItems, totalValue };
-  }, []);
+  }, [inventoryItems]);
 
   // Handle sort
   const handleSort = (field: SortField) => {
@@ -299,35 +171,86 @@ export function InventoryPage() {
   };
 
   // Get stock status
-  const getStockStatus = (item: typeof MOCK_INVENTORY[0]) => {
+  const getStockStatus = (item: InventoryItem) => {
     if (item.availableQuantity === 0) {
       return { label: "缺货", color: "bg-red-100 text-red-700", icon: AlertTriangle };
     }
-    if (item.availableQuantity <= item.minimumStock) {
+    if (item.availableQuantity <= item.minStock) {
       return { label: "库存不足", color: "bg-yellow-100 text-yellow-700", icon: AlertTriangle };
     }
     return { label: "正常", color: "bg-green-100 text-green-700", icon: Package };
   };
 
   // Open detail dialog
-  const openDetailDialog = (item: typeof MOCK_INVENTORY[0]) => {
+  const openDetailDialog = (item: InventoryItem) => {
     setSelectedItem(item);
     setShowDetailDialog(true);
   };
 
   // Open adjustment dialog
-  const openAdjustDialog = (item: typeof MOCK_INVENTORY[0]) => {
+  const openAdjustDialog = (item: InventoryItem) => {
     setSelectedItem(item);
     setAdjustment({ type: "in", quantity: 1, reason: "" });
     setShowAdjustDialog(true);
   };
 
   // Handle stock adjustment
-  const handleAdjustment = () => {
-    console.log("Adjust stock:", selectedItem, adjustment);
-    // TODO: API call to adjust stock
-    setShowAdjustDialog(false);
+  const handleAdjustment = async () => {
+    if (!selectedItem || !adjustment.reason) return;
+
+    setIsAdjusting(true);
+    try {
+      const dto: AdjustInventoryDto = {
+        quantity: adjustment.type === "in" ? adjustment.quantity : -adjustment.quantity,
+        reason: adjustment.reason,
+      };
+      const updated = await inventoryService.adjust(selectedItem.id, dto);
+
+      // Update local state
+      setInventoryItems((prev) =>
+        prev.map((item) => (item.id === updated.id ? updated : item))
+      );
+
+      setShowAdjustDialog(false);
+    } catch (err) {
+      console.error("Failed to adjust inventory:", err);
+      alert("库存调整失败");
+    } finally {
+      setIsAdjusting(false);
+    }
   };
+
+  // Handle search
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      loadInventoryData();
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const results = await inventoryService.search(searchQuery);
+      setInventoryItems(results);
+    } catch (err) {
+      console.error("Search failed:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-lg font-medium text-slate-900">{error}</p>
+          <Button className="mt-4" onClick={loadInventoryData}>
+            重试
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -367,8 +290,16 @@ export function InventoryPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalItems}</div>
-            <p className="text-xs text-muted-foreground mt-1">共计 {MOCK_INVENTORY.reduce((s, i) => s + i.totalQuantity, 0)} 件</p>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{stats.totalItems}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  共计 {inventoryItems.reduce((s, i) => s + i.quantity, 0)} 件
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -382,8 +313,14 @@ export function InventoryPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.lowStockItems}</div>
-            <p className="text-xs text-muted-foreground mt-1">低于最低库存量</p>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-yellow-600">{stats.lowStockItems}</div>
+                <p className="text-xs text-muted-foreground mt-1">低于最低库存量</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -397,8 +334,14 @@ export function InventoryPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.outOfStockItems}</div>
-            <p className="text-xs text-muted-foreground mt-1">需要立即补货</p>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-red-600">{stats.outOfStockItems}</div>
+                <p className="text-xs text-muted-foreground mt-1">需要立即补货</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -412,12 +355,18 @@ export function InventoryPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              ¥{(stats.totalValue / 10000).toFixed(1)}万
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              总价值 ¥{stats.totalValue.toLocaleString()}
-            </p>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  ¥{(stats.totalValue / 10000).toFixed(1)}万
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  总价值 ¥{stats.totalValue.toLocaleString()}
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -430,9 +379,10 @@ export function InventoryPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="搜索件号、配件名称或制造商..."
+                placeholder="搜索件号、配件名称..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 className="pl-10"
               />
             </div>
@@ -473,6 +423,7 @@ export function InventoryPage() {
                   setSearchQuery("");
                   setCategoryFilter("all");
                   setStockFilter("all");
+                  loadInventoryData();
                 }}
               >
                 清除筛选
@@ -495,150 +446,160 @@ export function InventoryPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                    <button
-                      className="flex items-center gap-1 hover:text-foreground"
-                      onClick={() => handleSort("partNumber")}
-                    >
-                      件号
-                      {sortField === "partNumber" && (
-                        <ArrowUpDown className="h-3 w-3" />
-                      )}
-                    </button>
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                    <button
-                      className="flex items-center gap-1 hover:text-foreground"
-                      onClick={() => handleSort("partName")}
-                    >
-                      配件名称
-                      {sortField === "partName" && (
-                        <ArrowUpDown className="h-3 w-3" />
-                      )}
-                    </button>
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                    分类
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                    位置
-                  </th>
-                  <th className="text-right py-3 px-4 font-medium text-sm text-muted-foreground">
-                    <button
-                      className="flex items-center gap-1 hover:text-foreground ml-auto"
-                      onClick={() => handleSort("availableQuantity")}
-                    >
-                      可用库存
-                      {sortField === "availableQuantity" && (
-                        <ArrowUpDown className="h-3 w-3" />
-                      )}
-                    </button>
-                  </th>
-                  <th className="text-right py-3 px-4 font-medium text-sm text-muted-foreground">
-                    单价
-                  </th>
-                  <th className="text-center py-3 px-4 font-medium text-sm text-muted-foreground">
-                    状态
-                  </th>
-                  <th className="text-right py-3 px-4 font-medium text-sm text-muted-foreground">
-                    操作
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredInventory.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="text-center py-12 text-muted-foreground">
-                      {searchQuery || categoryFilter !== "all" || stockFilter !== "all"
-                        ? "未找到匹配的配件"
-                        : "暂无配件数据"}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredInventory.map((item) => {
-                    const stockStatus = getStockStatus(item);
-                    const StatusIcon = stockStatus.icon;
-
-                    return (
-                      <tr
-                        key={item.id}
-                        className="border-b hover:bg-muted/50 cursor-pointer"
-                        onClick={() => openDetailDialog(item)}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                      <button
+                        className="flex items-center gap-1 hover:text-foreground"
+                        onClick={() => handleSort("partNumber")}
                       >
-                        <td className="py-3 px-4">
-                          <span className="font-mono text-sm">{item.partNumber}</span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div>
-                            <p className="font-medium">{item.partName}</p>
-                            <p className="text-xs text-muted-foreground">{item.manufacturer}</p>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-sm">{item.category}</td>
-                        <td className="py-3 px-4 text-sm">
-                          <div className="flex items-center gap-1">
-                            <Warehouse className="h-3 w-3 text-muted-foreground" />
-                            {item.locations[0]?.position || "-"}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <span className="font-medium">{item.availableQuantity}</span>
-                            <span className="text-muted-foreground">/ {item.totalQuantity}</span>
-                            <span className="text-muted-foreground text-xs">{item.unit}</span>
-                          </div>
-                          {item.reservedQuantity > 0 && (
-                            <p className="text-xs text-amber-600 text-right">
-                              已预留 {item.reservedQuantity}
-                            </p>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-right font-medium">
-                          ¥{item.unitCost.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <Badge className={stockStatus.color}>
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {stockStatus.label}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openAdjustDialog(item);
-                              }}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                // TODO: Open QR code
-                              }}
-                            >
-                              <QrCode className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                        件号
+                        {sortField === "partNumber" && (
+                          <ArrowUpDown className="h-3 w-3" />
+                        )}
+                      </button>
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                      <button
+                        className="flex items-center gap-1 hover:text-foreground"
+                        onClick={() => handleSort("name")}
+                      >
+                        配件名称
+                        {sortField === "name" && (
+                          <ArrowUpDown className="h-3 w-3" />
+                        )}
+                      </button>
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                      分类
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
+                      位置
+                    </th>
+                    <th className="text-right py-3 px-4 font-medium text-sm text-muted-foreground">
+                      <button
+                        className="flex items-center gap-1 hover:text-foreground ml-auto"
+                        onClick={() => handleSort("availableQuantity")}
+                      >
+                        可用库存
+                        {sortField === "availableQuantity" && (
+                          <ArrowUpDown className="h-3 w-3" />
+                        )}
+                      </button>
+                    </th>
+                    <th className="text-right py-3 px-4 font-medium text-sm text-muted-foreground">
+                      单价
+                    </th>
+                    <th className="text-center py-3 px-4 font-medium text-sm text-muted-foreground">
+                      状态
+                    </th>
+                    <th className="text-right py-3 px-4 font-medium text-sm text-muted-foreground">
+                      操作
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredInventory.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="text-center py-12 text-muted-foreground">
+                        {searchQuery || categoryFilter !== "all" || stockFilter !== "all"
+                          ? "未找到匹配的配件"
+                          : "暂无配件数据"}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredInventory.map((item) => {
+                      const stockStatus = getStockStatus(item);
+                      const StatusIcon = stockStatus.icon;
+
+                      return (
+                        <tr
+                          key={item.id}
+                          className="border-b hover:bg-muted/50 cursor-pointer"
+                          onClick={() => openDetailDialog(item)}
+                        >
+                          <td className="py-3 px-4">
+                            <span className="font-mono text-sm">{item.partNumber}</span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div>
+                              <p className="font-medium">{item.name}</p>
+                              {item.description && (
+                                <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                  {item.description}
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-sm">{item.category || "-"}</td>
+                          <td className="py-3 px-4 text-sm">
+                            <div className="flex items-center gap-1">
+                              <Warehouse className="h-3 w-3 text-muted-foreground" />
+                              {item.location || item.binNumber || "-"}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="font-medium">{item.availableQuantity}</span>
+                              <span className="text-muted-foreground">/ {item.quantity}</span>
+                              <span className="text-muted-foreground text-xs">{item.unit}</span>
+                            </div>
+                            {item.reservedQuantity > 0 && (
+                              <p className="text-xs text-amber-600 text-right">
+                                已预留 {item.reservedQuantity}
+                              </p>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right font-medium">
+                            {item.unitCost ? `¥${item.unitCost.toLocaleString()}` : "-"}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <Badge className={stockStatus.color}>
+                              <StatusIcon className="h-3 w-3 mr-1" />
+                              {stockStatus.label}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openAdjustDialog(item);
+                                }}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // TODO: Open QR code
+                                }}
+                              >
+                                <QrCode className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -648,7 +609,7 @@ export function InventoryPage() {
           <DialogHeader>
             <DialogTitle>配件详情</DialogTitle>
             <DialogDescription>
-              {selectedItem?.partNumber} - {selectedItem?.partName}
+              {selectedItem?.partNumber} - {selectedItem?.name}
             </DialogDescription>
           </DialogHeader>
           {selectedItem && (
@@ -661,23 +622,25 @@ export function InventoryPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">配件名称</p>
-                  <p className="font-medium">{selectedItem.partName}</p>
+                  <p className="font-medium">{selectedItem.name}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">分类</p>
-                  <p className="font-medium">{selectedItem.category}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">制造商</p>
-                  <p className="font-medium">{selectedItem.manufacturer}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">单价</p>
-                  <p className="font-medium">¥{selectedItem.unitCost.toLocaleString()}</p>
+                  <p className="font-medium">{selectedItem.category || "-"}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">单位</p>
                   <p className="font-medium">{selectedItem.unit}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">单价</p>
+                  <p className="font-medium">
+                    {selectedItem.unitCost ? `¥${selectedItem.unitCost.toLocaleString()}` : "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">批次号</p>
+                  <p className="font-medium">{selectedItem.batchNumber || "-"}</p>
                 </div>
               </div>
 
@@ -687,7 +650,7 @@ export function InventoryPage() {
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">总库存</p>
-                    <p className="font-medium">{selectedItem.totalQuantity} {selectedItem.unit}</p>
+                    <p className="font-medium">{selectedItem.quantity} {selectedItem.unit}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">可用</p>
@@ -700,56 +663,48 @@ export function InventoryPage() {
                 </div>
               </div>
 
-              {/* Locations */}
-              <div>
-                <p className="text-sm font-medium mb-2">存储位置</p>
-                <div className="space-y-2">
-                  {selectedItem.locations.map((loc, i) => (
-                    <div key={i} className="flex items-center justify-between p-2 border rounded">
-                      <div className="flex items-center gap-2">
-                        <Warehouse className="h-4 w-4 text-muted-foreground" />
-                        <span>{loc.warehouse}</span>
-                        <span className="text-muted-foreground">·</span>
-                        <span>{loc.area}</span>
-                        <span className="text-muted-foreground">·</span>
-                        <span className="font-mono">{loc.position}</span>
-                      </div>
-                      <span className="font-medium">{loc.quantity} {selectedItem.unit}</span>
-                    </div>
-                  ))}
+              {/* Location Info */}
+              <div className="p-4 bg-slate-50 rounded-lg">
+                <p className="text-sm font-medium mb-3">存储位置</p>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">位置</p>
+                    <p className="font-medium">{selectedItem.location || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">货位号</p>
+                    <p className="font-medium">{selectedItem.binNumber || "-"}</p>
+                  </div>
                 </div>
               </div>
 
-              {/* Specifications */}
-              <div>
-                <p className="text-sm font-medium mb-2">技术规格</p>
-                <div className="p-3 bg-slate-50 rounded text-sm space-y-1">
-                  {Object.entries(selectedItem.specifications).map(([key, value]) => (
-                    <div key={key} className="flex justify-between">
-                      <span className="text-muted-foreground">{key}:</span>
-                      <span>{String(value)}</span>
-                    </div>
-                  ))}
+              {/* Stock Thresholds */}
+              <div className="grid grid-cols-4 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">最低库存</p>
+                  <p className="font-medium">{selectedItem.minStock}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">最高库存</p>
+                  <p className="font-medium">{selectedItem.maxStock || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">补货点</p>
+                  <p className="font-medium">{selectedItem.reorderPoint}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">补货量</p>
+                  <p className="font-medium">{selectedItem.reorderQuantity}</p>
                 </div>
               </div>
 
-              {/* Compatible Aircraft */}
-              <div>
-                <p className="text-sm font-medium mb-2">适用机型</p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedItem.compatibleAircraft.map((aircraft, i) => (
-                    <Badge key={i} variant="outline">
-                      {aircraft}
-                    </Badge>
-                  ))}
+              {/* Description */}
+              {selectedItem.description && (
+                <div>
+                  <p className="text-sm font-medium mb-2">描述</p>
+                  <p className="text-sm text-muted-foreground">{selectedItem.description}</p>
                 </div>
-              </div>
-
-              {/* Restock Info */}
-              <div className="text-xs text-muted-foreground">
-                <p>上次补货: {selectedItem.lastRestockDate}</p>
-                <p>供应商: {selectedItem.lastRestockSupplier}</p>
-              </div>
+              )}
             </div>
           )}
           <DialogFooter>
@@ -758,7 +713,7 @@ export function InventoryPage() {
             </Button>
             <Button onClick={() => {
               setShowDetailDialog(false);
-              openAdjustDialog(selectedItem!);
+              if (selectedItem) openAdjustDialog(selectedItem);
             }}>
               调整库存
             </Button>
@@ -772,7 +727,7 @@ export function InventoryPage() {
           <DialogHeader>
             <DialogTitle>调整库存</DialogTitle>
             <DialogDescription>
-              {selectedItem?.partName} - 当前库存: {selectedItem?.availableQuantity}
+              {selectedItem?.name} - 当前库存: {selectedItem?.availableQuantity}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -827,9 +782,20 @@ export function InventoryPage() {
             </Button>
             <Button
               onClick={handleAdjustment}
-              disabled={!adjustment.reason || (adjustment.type === "out" && selectedItem && adjustment.quantity > selectedItem.availableQuantity)}
+              disabled={
+                isAdjusting ||
+                !adjustment.reason ||
+                (adjustment.type === "out" && selectedItem && adjustment.quantity > selectedItem.availableQuantity)
+              }
             >
-              确认调整
+              {isAdjusting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  处理中...
+                </>
+              ) : (
+                "确认调整"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

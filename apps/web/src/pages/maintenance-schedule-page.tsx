@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   Plus,
@@ -10,7 +10,9 @@ import {
   CheckCircle,
   Pause,
   MoreHorizontal,
-  User,
+  Loader2,
+  Play,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -22,211 +24,165 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { AircraftStatusBadge } from "../components/common/status-badge";
+import {
+  maintenanceSchedulerService,
+  MaintenanceAlert,
+  ScheduleCounts,
+  TriggerType,
+} from "../services/maintenance-scheduler.service";
 
-// 维保触发器类型
-const TRIGGER_TYPES = {
+// Trigger type configuration
+const TRIGGER_TYPES: Record<TriggerType, { label: string; icon: typeof Calendar; color: string }> = {
   CALENDAR_DAYS: { label: "日历日", icon: Calendar, color: "text-blue-500" },
   FLIGHT_HOURS: { label: "飞行小时", icon: Clock, color: "text-green-500" },
   FLIGHT_CYCLES: { label: "起降循环", icon: AlertTriangle, color: "text-orange-500" },
   BATTERY_CYCLES: { label: "电池循环", icon: CheckCircle, color: "text-purple-500" },
 };
 
-// 维保状态
-const SCHEDULE_STATUS = {
-  ACTIVE: { label: "进行中", color: "bg-green-100 text-green-700" },
-  PAUSED: { label: "暂停", color: "bg-yellow-100 text-yellow-700" },
-  COMPLETED: { label: "已完成", color: "bg-blue-100 text-blue-700" },
+// Alert type configuration
+const ALERT_TYPE_CONFIG = {
+  WARNING: { label: "预警", color: "bg-yellow-100 text-yellow-700" },
+  DUE: { label: "到期", color: "bg-orange-100 text-orange-700" },
+  OVERDUE: { label: "逾期", color: "bg-red-100 text-red-700" },
 };
 
 /**
- * 维保计划列表页
+ * Maintenance Schedule List Page
  */
 export function MaintenanceSchedulePage() {
+  // Data state
+  const [alerts, setAlerts] = useState<MaintenanceAlert[]>([]);
+  const [counts, setCounts] = useState<ScheduleCounts | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRunningScheduler, setIsRunningScheduler] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
-  // Mock aircraft data
-  const aircraft = [
-    { id: "ac-001", registration: "B-7011U" },
-    { id: "ac-002", registration: "B-7012U" },
-    { id: "ac-003", registration: "B-7013U" },
-  ];
+  // Load data
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  // Mock maintenance schedules
-  const schedules = [
-    {
-      id: "ms-001",
-      name: "电机定期检查",
-      description: "每50飞行小时检查电机状态",
-      aircraftId: "ac-001",
-      aircraftRegistration: "B-7011U",
-      triggerType: "FLIGHT_HOURS",
-      triggerValue: 50,
-      currentUsage: 125.5,
-      lastCompleted: "2026-01-01",
-      nextDue: "2026-01-20",
-      status: "ACTIVE" as const,
-      priority: "high" as const,
-    },
-    {
-      id: "ms-002",
-      name: "螺旋桨更换",
-      description: "每200小时更换螺旋桨",
-      aircraftId: "ac-001",
-      aircraftRegistration: "B-7011U",
-      triggerType: "FLIGHT_HOURS",
-      triggerValue: 200,
-      currentUsage: 125.5,
-      lastCompleted: "2025-10-15",
-      nextDue: "2026-02-10",
-      status: "ACTIVE" as const,
-      priority: "medium" as const,
-    },
-    {
-      id: "ms-003",
-      name: "180天日历检查",
-      description: "每180天进行的全面检查",
-      aircraftId: "ac-001",
-      aircraftRegistration: "B-7011U",
-      triggerType: "CALENDAR_DAYS",
-      triggerValue: 180,
-      currentUsage: 45,
-      lastCompleted: "2025-07-20",
-      nextDue: "2026-01-16",
-      status: "ACTIVE" as const,
-      priority: "high" as const,
-    },
-    {
-      id: "ms-004",
-      name: "电池包更换",
-      description: "电池循环达到300次后更换",
-      aircraftId: "ac-002",
-      aircraftRegistration: "B-7012U",
-      triggerType: "BATTERY_CYCLES",
-      triggerValue: 300,
-      currentUsage: 198,
-      lastCompleted: "2025-08-01",
-      nextDue: "2026-03-15",
-      status: "ACTIVE" as const,
-      priority: "medium" as const,
-    },
-    {
-      id: "ms-005",
-      name: "起落架检查",
-      description: "每100次起降检查起落架",
-      aircraftId: "ac-002",
-      aircraftRegistration: "B-7012U",
-      triggerType: "FLIGHT_CYCLES",
-      triggerValue: 100,
-      currentUsage: 72,
-      lastCompleted: "2025-11-20",
-      nextDue: "2026-02-01",
-      status: "ACTIVE" as const,
-      priority: "low" as const,
-    },
-    {
-      id: "ms-006",
-      name: "GPS模块校准",
-      description: "定期校准GPS模块",
-      aircraftId: "ac-003",
-      aircraftRegistration: "B-7013U",
-      triggerType: "CALENDAR_DAYS",
-      triggerValue: 90,
-      currentUsage: 30,
-      lastCompleted: "2025-10-01",
-      nextDue: "2025-12-30",
-      status: "COMPLETED" as const,
-      priority: "low" as const,
-    },
-    {
-      id: "ms-007",
-      name: "飞控软件升级",
-      description: "飞控系统固件升级计划",
-      aircraftId: "ac-003",
-      aircraftRegistration: "B-7013U",
-      triggerType: "CALENDAR_DAYS",
-      triggerValue: 30,
-      currentUsage: 15,
-      lastCompleted: "2025-12-01",
-      nextDue: "2026-01-15",
-      status: "PAUSED" as const,
-      priority: "medium" as const,
-    },
-  ];
+  const loadData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [alertsData, countsData] = await Promise.all([
+        maintenanceSchedulerService.getAlerts({ limit: 100 }),
+        maintenanceSchedulerService.getScheduleCounts(),
+      ]);
+      setAlerts(alertsData);
+      setCounts(countsData);
+    } catch (err) {
+      console.error("Failed to load maintenance data:", err);
+      setError("加载维保数据失败");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  // Filter schedules
-  const filteredSchedules = schedules.filter((schedule) => {
-    const matchesSearch =
-      schedule.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      schedule.aircraftRegistration.toLowerCase().includes(searchQuery.toLowerCase());
+  const handleRunScheduler = async () => {
+    setIsRunningScheduler(true);
+    try {
+      const result = await maintenanceSchedulerService.runScheduler();
+      console.log("Scheduler result:", result);
+      // Reload data after running scheduler
+      await loadData();
+    } catch (err) {
+      console.error("Failed to run scheduler:", err);
+      alert("运行调度器失败");
+    } finally {
+      setIsRunningScheduler(false);
+    }
+  };
 
-    const matchesStatus = statusFilter === "all" || schedule.status === statusFilter;
-    const matchesType = typeFilter === "all" || schedule.triggerType === typeFilter;
+  // Filter alerts
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter((alert) => {
+      const matchesSearch =
+        searchQuery === "" ||
+        alert.scheduleName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        alert.aircraftRegistration.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        alert.triggerName.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return matchesSearch && matchesStatus && matchesType;
-  });
+      const matchesStatus = statusFilter === "all" || alert.alertType === statusFilter;
+      const matchesType = typeFilter === "all" || alert.triggerType === typeFilter;
+
+      return matchesSearch && matchesStatus && matchesType;
+    });
+  }, [alerts, searchQuery, statusFilter, typeFilter]);
+
+  // Statistics
+  const stats = useMemo(() => {
+    const total = counts
+      ? counts.PENDING + counts.DUE + counts.OVERDUE + counts.COMPLETED
+      : 0;
+    const overdue = alerts.filter((a) => a.alertType === "OVERDUE").length;
+    const due = alerts.filter((a) => a.alertType === "DUE").length;
+    const warning = alerts.filter((a) => a.alertType === "WARNING").length;
+
+    return { total, overdue, due, warning };
+  }, [alerts, counts]);
+
+  // Get remaining display
+  const getRemainingDisplay = (alert: MaintenanceAlert) => {
+    if (alert.remainingDays !== null) {
+      if (alert.remainingDays < 0) {
+        return `逾期 ${Math.abs(alert.remainingDays)} 天`;
+      }
+      return `${alert.remainingDays} 天后到期`;
+    }
+    if (alert.remainingValue !== null) {
+      const triggerConfig = TRIGGER_TYPES[alert.triggerType];
+      const unit =
+        alert.triggerType === "FLIGHT_HOURS"
+          ? "小时"
+          : alert.triggerType === "FLIGHT_CYCLES"
+          ? "次"
+          : alert.triggerType === "BATTERY_CYCLES"
+          ? "次"
+          : "";
+      if (alert.remainingValue < 0) {
+        return `逾期 ${Math.abs(alert.remainingValue).toFixed(1)} ${unit}`;
+      }
+      return `剩余 ${alert.remainingValue.toFixed(1)} ${unit}`;
+    }
+    return "-";
+  };
 
   // Calculate progress
-  const calculateProgress = (schedule: typeof schedules[0]) => {
-    if (schedule.triggerType === "FLIGHT_HOURS" || schedule.triggerType === "BATTERY_CYCLES") {
-      const progress = (schedule.currentUsage % schedule.triggerValue) / schedule.triggerValue * 100;
+  const calculateProgress = (alert: MaintenanceAlert) => {
+    if (alert.dueAtValue !== null && alert.currentValue !== null) {
+      // For value-based triggers
+      const progress = (alert.currentValue / alert.dueAtValue) * 100;
       return Math.min(progress, 100);
     }
-    if (schedule.triggerType === "FLIGHT_CYCLES") {
-      const progress = (schedule.currentUsage % schedule.triggerValue) / schedule.triggerValue * 100;
-      return Math.min(progress, 100);
+    if (alert.remainingDays !== null) {
+      // For calendar-based triggers - assuming 30 days total
+      const totalDays = 30; // Default interval
+      const daysPassed = totalDays - alert.remainingDays;
+      return Math.min((daysPassed / totalDays) * 100, 100);
     }
-    // Calendar days - calculate based on days passed since last completion
-    const daysSinceLast = Math.floor(
-      (Date.now() - new Date(schedule.lastCompleted).getTime()) / (1000 * 60 * 60 * 24)
-    );
-    return Math.min((daysSinceLast / schedule.triggerValue) * 100, 100);
+    return 0;
   };
 
-  // Check if due soon
-  const isDueSoon = (schedule: typeof schedules[0]) => {
-    if (schedule.status !== "ACTIVE") return false;
-    const daysUntilDue = Math.ceil(
-      (new Date(schedule.nextDue).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-    );
-    return daysUntilDue <= 7 && daysUntilDue >= 0;
-  };
-
-  // Check if overdue
-  const isOverdue = (schedule: typeof schedules[0]) => {
-    if (schedule.status !== "ACTIVE") return false;
-    return new Date(schedule.nextDue) < new Date();
-  };
-
-  // Priority badge
-  const PriorityBadge = ({ priority }: { priority: "high" | "medium" | "low" }) => {
-    const styles = {
-      high: "bg-red-100 text-red-700",
-      medium: "bg-yellow-100 text-yellow-700",
-      low: "bg-slate-100 text-slate-700",
-    };
-    const labels = {
-      high: "高",
-      medium: "中",
-      low: "低",
-    };
+  if (error) {
     return (
-      <Badge className={styles[priority]}>
-        {labels[priority]}
-      </Badge>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-lg font-medium text-slate-900">{error}</p>
+          <Button className="mt-4" onClick={loadData}>
+            重试
+          </Button>
+        </div>
+      </div>
     );
-  };
-
-  // Status counts
-  const statusCounts = schedules.reduce(
-    (acc, s) => {
-      acc[s.status] = (acc[s.status] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
+  }
 
   return (
     <div className="space-y-6">
@@ -238,12 +194,22 @@ export function MaintenanceSchedulePage() {
             管理飞机和零部件的维保计划与触发器
           </p>
         </div>
-        <Button asChild>
-          <Link to="/maintenance/schedules/new">
-            <Plus className="w-4 h-4 mr-2" />
-            新建计划
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleRunScheduler} disabled={isRunningScheduler}>
+            {isRunningScheduler ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            运行调度器
+          </Button>
+          <Button asChild>
+            <Link to="/maintenance/schedules/new">
+              <Plus className="w-4 h-4 mr-2" />
+              新建计划
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -251,23 +217,29 @@ export function MaintenanceSchedulePage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              全部计划
+              全部预警
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{schedules.length}</div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-2xl font-bold">{alerts.length}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              进行中
+              预警
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {statusCounts.ACTIVE || 0}
-            </div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-2xl font-bold text-yellow-600">{stats.warning}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -277,9 +249,11 @@ export function MaintenanceSchedulePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {schedules.filter(isDueSoon).length}
-            </div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-2xl font-bold text-orange-600">{stats.due}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -289,9 +263,11 @@ export function MaintenanceSchedulePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {schedules.filter(isOverdue).length}
-            </div>
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <div className="text-2xl font-bold text-red-600">{stats.overdue}</div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -303,28 +279,31 @@ export function MaintenanceSchedulePage() {
           size="sm"
           onClick={() => setStatusFilter("all")}
         >
-          全部 ({schedules.length})
+          全部 ({alerts.length})
         </Button>
         <Button
-          variant={statusFilter === "ACTIVE" ? "default" : "outline"}
+          variant={statusFilter === "WARNING" ? "default" : "outline"}
           size="sm"
-          onClick={() => setStatusFilter("ACTIVE")}
+          onClick={() => setStatusFilter("WARNING")}
+          className={statusFilter === "WARNING" ? "bg-yellow-600 hover:bg-yellow-700" : ""}
         >
-          进行中 ({statusCounts.ACTIVE || 0})
+          预警 ({stats.warning})
         </Button>
         <Button
-          variant={statusFilter === "PAUSED" ? "default" : "outline"}
+          variant={statusFilter === "DUE" ? "default" : "outline"}
           size="sm"
-          onClick={() => setStatusFilter("PAUSED")}
+          onClick={() => setStatusFilter("DUE")}
+          className={statusFilter === "DUE" ? "bg-orange-600 hover:bg-orange-700" : ""}
         >
-          暂停 ({statusCounts.PAUSED || 0})
+          到期 ({stats.due})
         </Button>
         <Button
-          variant={statusFilter === "COMPLETED" ? "default" : "outline"}
+          variant={statusFilter === "OVERDUE" ? "default" : "outline"}
           size="sm"
-          onClick={() => setStatusFilter("COMPLETED")}
+          onClick={() => setStatusFilter("OVERDUE")}
+          className={statusFilter === "OVERDUE" ? "bg-red-600 hover:bg-red-700" : ""}
         >
-          已完成 ({statusCounts.COMPLETED || 0})
+          逾期 ({stats.overdue})
         </Button>
       </div>
 
@@ -357,134 +336,145 @@ export function MaintenanceSchedulePage() {
         </CardContent>
       </Card>
 
-      {/* Schedules List */}
+      {/* Alerts List */}
       <Card>
         <CardHeader>
-          <CardTitle>维保计划列表</CardTitle>
+          <CardTitle>维保预警列表</CardTitle>
           <CardDescription>
-            共 {filteredSchedules.length} 个维保计划
+            共 {filteredAlerts.length} 条预警
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {filteredSchedules.map((schedule) => {
-              const TriggerIcon = TRIGGER_TYPES[schedule.triggerType].icon;
-              const progress = calculateProgress(schedule);
-              const dueSoon = isDueSoon(schedule);
-              const overdue = isOverdue(schedule);
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredAlerts.map((alert) => {
+                const triggerConfig = TRIGGER_TYPES[alert.triggerType];
+                const TriggerIcon = triggerConfig?.icon || Calendar;
+                const alertConfig = ALERT_TYPE_CONFIG[alert.alertType];
+                const progress = calculateProgress(alert);
+                const isOverdue = alert.alertType === "OVERDUE";
+                const isDue = alert.alertType === "DUE";
 
-              return (
-                <div
-                  key={schedule.id}
-                  className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-4 flex-1">
-                      {/* Trigger Icon */}
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                        overdue ? "bg-red-100" : dueSoon ? "bg-orange-100" : "bg-slate-100"
-                      }`}>
-                        <TriggerIcon className={`h-5 w-5 ${TRIGGER_TYPES[schedule.triggerType].color}`} />
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Link
-                            to={`/maintenance/schedules/${schedule.id}`}
-                            className="font-medium text-slate-900 hover:text-primary"
-                          >
-                            {schedule.name}
-                          </Link>
-                          <PriorityBadge priority={schedule.priority} />
-                          <Badge className={SCHEDULE_STATUS[schedule.status].color}>
-                            {SCHEDULE_STATUS[schedule.status].label}
-                          </Badge>
-                          {overdue && (
-                            <Badge variant="destructive" className="gap-1">
-                              <AlertTriangle className="h-3 w-3" />
-                              已逾期
-                            </Badge>
-                          )}
-                          {dueSoon && !overdue && (
-                            <Badge variant="outline" className="border-orange-500 text-orange-700 gap-1">
-                              <AlertTriangle className="h-3 w-3" />
-                              即将到期
-                            </Badge>
-                          )}
+                return (
+                  <div
+                    key={`${alert.scheduleId}-${alert.triggerId}`}
+                    className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4 flex-1">
+                        {/* Trigger Icon */}
+                        <div
+                          className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                            isOverdue
+                              ? "bg-red-100"
+                              : isDue
+                              ? "bg-orange-100"
+                              : "bg-yellow-100"
+                          }`}
+                        >
+                          <TriggerIcon
+                            className={`h-5 w-5 ${triggerConfig?.color || "text-slate-500"}`}
+                          />
                         </div>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {schedule.description}
-                        </p>
 
-                        {/* Details */}
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                          <span className="text-muted-foreground">
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="font-medium text-slate-900">
+                              {alert.scheduleName}
+                            </span>
+                            <Badge className={alertConfig.color}>{alertConfig.label}</Badge>
+                            <span className="text-sm text-muted-foreground">
+                              {alert.triggerName}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">
                             飞机:{" "}
                             <Link
-                              to={`/aircraft/${schedule.aircraftId}`}
+                              to={`/aircraft/${alert.aircraftId}`}
                               className="text-primary hover:underline"
                             >
-                              {schedule.aircraftRegistration}
+                              {alert.aircraftRegistration}
                             </Link>
-                          </span>
-                          <span className="text-muted-foreground">
-                            触发: {TRIGGER_TYPES[schedule.triggerType].label} / {schedule.triggerValue}
-                          </span>
-                          <span className="text-muted-foreground">
-                            下次到期: {schedule.nextDue}
-                          </span>
-                        </div>
+                            {" | "}
+                            触发类型: {triggerConfig?.label || alert.triggerType}
+                          </p>
 
-                        {/* Progress Bar */}
-                        <div className="mt-3">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                            <span>进度</span>
-                            <span>{Math.round(progress)}%</span>
-                          </div>
-                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full transition-all ${
-                                overdue ? "bg-red-500" : dueSoon ? "bg-orange-500" : "bg-green-500"
+                          {/* Progress and Details */}
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                            <span>
+                              当前值: {alert.currentValue?.toFixed(1) || "-"}
+                            </span>
+                            {alert.dueAtValue !== null && (
+                              <span>到期值: {alert.dueAtValue.toFixed(1)}</span>
+                            )}
+                            <span
+                              className={`font-medium ${
+                                isOverdue
+                                  ? "text-red-600"
+                                  : isDue
+                                  ? "text-orange-600"
+                                  : "text-yellow-600"
                               }`}
-                              style={{ width: `${progress}%` }}
-                            />
+                            >
+                              {getRemainingDisplay(alert)}
+                            </span>
+                          </div>
+
+                          {/* Progress Bar */}
+                          <div className="mt-3">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                              <span>进度</span>
+                              <span>{Math.round(progress)}%</span>
+                            </div>
+                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full transition-all ${
+                                  isOverdue
+                                    ? "bg-red-500"
+                                    : isDue
+                                    ? "bg-orange-500"
+                                    : "bg-yellow-500"
+                                }`}
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-1">
-                      {schedule.status === "PAUSED" && (
-                        <Button variant="ghost" size="icon" title="恢复">
-                          <CheckCircle className="w-4 h-4" />
+                      {/* Actions */}
+                      <div className="flex items-center gap-1">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to={`/work-orders/new?schedule=${alert.scheduleId}`}>
+                            创建工单
+                          </Link>
                         </Button>
-                      )}
-                      {schedule.status === "ACTIVE" && (
-                        <Button variant="ghost" size="icon" title="暂停">
-                          <Pause className="w-4 h-4" />
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Empty State */}
-          {filteredSchedules.length === 0 && (
+          {!isLoading && filteredAlerts.length === 0 && (
             <div className="text-center py-12">
-              <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">未找到维保计划</h3>
-              <p className="text-muted-foreground mb-4">
+              <CheckCircle className="w-12 h-12 mx-auto mb-4 text-green-500 opacity-50" />
+              <h3 className="text-lg font-semibold mb-2">
+                {searchQuery || statusFilter !== "all" || typeFilter !== "all"
+                  ? "未找到匹配的维保预警"
+                  : "暂无维保预警"}
+              </h3>
+              <p className="text-muted-foreground">
                 {searchQuery || statusFilter !== "all" || typeFilter !== "all"
                   ? "尝试调整搜索或筛选条件"
-                  : "点击上方按钮创建第一个维保计划"}
+                  : "所有维保项目状态正常"}
               </p>
             </div>
           )}

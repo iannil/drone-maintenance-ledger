@@ -184,9 +184,9 @@ export function WorkOrderExecutePage() {
   }, []);
 
   const currentTask = workOrder.tasks[currentTaskIndex];
-  const currentExecution = taskExecutions[currentTask.id] || {
+  const currentExecution: TaskExecution = taskExecutions[currentTask.id] || {
     taskId: currentTask.id,
-    status: currentTask.status,
+    status: currentTask.status as "PENDING" | "IN_PROGRESS" | "COMPLETED",
     notes: "",
     photos: [],
     completedAt: null,

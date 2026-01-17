@@ -11,10 +11,14 @@ import {
   TrendingUp,
   Clock,
   CheckCircle2,
+  AlertTriangle,
+  Boxes,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { authStore } from "../stores/auth.store";
 import { statsService, DashboardStats, RecentActivity, DueMaintenanceItem } from "../services/stats.service";
+import { maintenanceSchedulerService, MaintenanceAlert } from "../services/maintenance-scheduler.service";
+import { inventoryService, InventoryAlerts } from "../services/inventory.service";
 
 /**
  * Format relative time from ISO date string
@@ -41,20 +45,26 @@ export function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activities, setActivities] = useState<RecentActivity[]>([]);
   const [dueMaintenanceItems, setDueMaintenanceItems] = useState<DueMaintenanceItem[]>([]);
+  const [maintenanceAlerts, setMaintenanceAlerts] = useState<MaintenanceAlert[]>([]);
+  const [inventoryAlerts, setInventoryAlerts] = useState<InventoryAlerts | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function loadDashboardData() {
       setIsLoading(true);
       try {
-        const [statsData, activitiesData, maintenanceData] = await Promise.all([
+        const [statsData, activitiesData, maintenanceData, schedulerAlerts, invAlerts] = await Promise.all([
           statsService.getDashboardStats(),
           statsService.getRecentActivities(10),
           statsService.getDueMaintenanceItems(5),
+          maintenanceSchedulerService.getAlerts({ limit: 5 }).catch(() => []),
+          inventoryService.getAlerts().catch(() => ({ lowStock: [], expiring: [] })),
         ]);
         setStats(statsData);
         setActivities(activitiesData);
         setDueMaintenanceItems(maintenanceData);
+        setMaintenanceAlerts(schedulerAlerts);
+        setInventoryAlerts(invAlerts);
       } catch (error) {
         console.error("Failed to load dashboard data:", error);
       } finally {
@@ -279,6 +289,93 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Inventory Alerts Summary */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>库存预警</CardTitle>
+              <CardDescription>需要关注的库存问题</CardDescription>
+            </div>
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/inventory/alerts">查看全部</Link>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex gap-4">
+              <Skeleton className="h-20 flex-1" />
+              <Skeleton className="h-20 flex-1" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Low Stock */}
+              <div className="p-4 rounded-lg border bg-orange-50/50 border-orange-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <AlertTriangle className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">库存不足</p>
+                    <p className="text-2xl font-bold text-orange-600">
+                      {inventoryAlerts?.lowStock.length || 0}
+                    </p>
+                  </div>
+                  {(inventoryAlerts?.lowStock.length || 0) > 0 && (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to="/inventory/alerts">处理</Link>
+                    </Button>
+                  )}
+                </div>
+                {inventoryAlerts && inventoryAlerts.lowStock.length > 0 && (
+                  <div className="mt-3 text-xs text-muted-foreground">
+                    {inventoryAlerts.lowStock.slice(0, 3).map((item, i) => (
+                      <span key={item.id}>
+                        {item.name}
+                        {i < Math.min(inventoryAlerts.lowStock.length, 3) - 1 ? "、" : ""}
+                      </span>
+                    ))}
+                    {inventoryAlerts.lowStock.length > 3 && ` 等${inventoryAlerts.lowStock.length}项`}
+                  </div>
+                )}
+              </div>
+
+              {/* Expiring */}
+              <div className="p-4 rounded-lg border bg-yellow-50/50 border-yellow-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-yellow-100 rounded-lg">
+                    <Boxes className="w-5 h-5 text-yellow-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">即将过期</p>
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {inventoryAlerts?.expiring.length || 0}
+                    </p>
+                  </div>
+                  {(inventoryAlerts?.expiring.length || 0) > 0 && (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to="/inventory/alerts">查看</Link>
+                    </Button>
+                  )}
+                </div>
+                {inventoryAlerts && inventoryAlerts.expiring.length > 0 && (
+                  <div className="mt-3 text-xs text-muted-foreground">
+                    {inventoryAlerts.expiring.slice(0, 3).map((item, i) => (
+                      <span key={item.id}>
+                        {item.name}
+                        {i < Math.min(inventoryAlerts.expiring.length, 3) - 1 ? "、" : ""}
+                      </span>
+                    ))}
+                    {inventoryAlerts.expiring.length > 3 && ` 等${inventoryAlerts.expiring.length}项`}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Quick Actions */}
       <Card>

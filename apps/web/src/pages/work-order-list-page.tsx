@@ -98,7 +98,7 @@ export function WorkOrderListPage() {
     const matchesSearch =
       wo.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       wo.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      aircraft?.registration?.toLowerCase().includes(searchQuery.toLowerCase());
+      aircraft?.registrationNumber?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = statusFilter === "all" || wo.status === statusFilter;
     const matchesType = typeFilter === "all" || wo.type === typeFilter;
@@ -183,7 +183,7 @@ export function WorkOrderListPage() {
                         {wo.title}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {aircraft?.registration || "未知飞机"}
+                        {aircraft?.registrationNumber || "未知飞机"}
                       </p>
                     </Link>
                   );
@@ -503,7 +503,7 @@ export function WorkOrderListPage() {
                               to={`/aircraft/${wo.aircraftId}`}
                               className="text-sm text-primary hover:underline"
                             >
-                              {aircraft.registration}
+                              {aircraft.registrationNumber}
                             </Link>
                           ) : (
                             <span className="text-sm text-muted-foreground">

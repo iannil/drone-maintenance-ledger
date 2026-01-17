@@ -196,7 +196,7 @@ export function FlightLogDetailPage() {
           </div>
           <p className="text-sm text-muted-foreground">
             {formatDate(flightLog.flightDate)} ·{" "}
-            {aircraft?.registration || "未知飞机"}
+            {aircraft?.registrationNumber || "未知飞机"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -231,7 +231,7 @@ export function FlightLogDetailPage() {
                   to={`/aircraft/${flightLog.aircraftId}`}
                   className="font-medium text-primary hover:underline"
                 >
-                  {aircraft.registration}
+                  {aircraft.registrationNumber}
                 </Link>
                 <p className="text-xs text-muted-foreground">{aircraft.model}</p>
               </>
