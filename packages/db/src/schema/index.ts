@@ -27,3 +27,6 @@ export * from "./flight/release-record";
 
 // Inventory & Supply Chain
 export * from "./inventory";
+
+// Database Indexes
+export { createIndexesSQL, applyIndexes } from "./indexes";

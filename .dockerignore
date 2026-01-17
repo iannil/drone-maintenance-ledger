@@ -1,0 +1,51 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+dist
+**/dist
+.next
+**/build
+
+# Development files
+.git
+.gitignore
+*.md
+!README.md
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files (use docker-compose env vars instead)
+.env
+.env.*
+!.env.example
+
+# Test files
+**/*.spec.ts
+**/*.test.ts
+**/coverage
+**/__tests__
+
+# Logs
+*.log
+logs
+
+# Misc
+.turbo
+.eslintcache
+*.tsbuildinfo
+
+# Documentation (not needed in container)
+docs
+
+# Backup files
+backup

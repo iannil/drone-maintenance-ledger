@@ -1,24 +1,72 @@
 import { Injectable, ConflictException, NotFoundException, Inject } from "@nestjs/common";
+import { IsString, IsEmail, IsOptional, IsBoolean, IsNotEmpty, IsIn } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 import type { User } from "@repo/db";
 
 import { UserRepository } from "./repositories/user.repository";
 
 /**
- * DTOs for user operations
+ * DTO for user registration
  */
-export interface RegisterDto {
-  username: string;
-  email: string;
-  password: string;
+export class RegisterDto {
+  @ApiProperty({ description: "用户名", example: "john_doe" })
+  @IsString()
+  @IsNotEmpty()
+  username!: string;
+
+  @ApiProperty({ description: "邮箱地址", example: "john@example.com" })
+  @IsEmail()
+  email!: string;
+
+  @ApiProperty({ description: "密码", example: "SecurePass123!" })
+  @IsString()
+  @IsNotEmpty()
+  password!: string;
+
+  @ApiPropertyOptional({ description: "用户全名", example: "John Doe" })
+  @IsString()
+  @IsOptional()
   fullName?: string;
-  role?: User["role"];
+
+  @ApiPropertyOptional({
+    description: "用户角色",
+    enum: ["ADMIN", "MECHANIC", "PILOT", "INSPECTOR", "MANAGER"],
+    example: "PILOT",
+  })
+  @IsString()
+  @IsOptional()
+  @IsIn(["ADMIN", "MECHANIC", "PILOT", "INSPECTOR", "MANAGER"])
+  role?: string;
 }
 
-export interface UpdateUserDto {
+/**
+ * DTO for updating user
+ */
+export class UpdateUserDto {
+  @ApiPropertyOptional({ description: "邮箱地址", example: "john@example.com" })
+  @IsEmail()
+  @IsOptional()
   email?: string;
+
+  @ApiPropertyOptional({ description: "用户全名", example: "John Doe" })
+  @IsString()
+  @IsOptional()
   fullName?: string;
-  role?: User["role"];
+
+  @ApiPropertyOptional({
+    description: "用户角色",
+    enum: ["ADMIN", "MECHANIC", "PILOT", "INSPECTOR", "MANAGER"],
+    example: "PILOT",
+  })
+  @IsString()
+  @IsOptional()
+  @IsIn(["ADMIN", "MECHANIC", "PILOT", "INSPECTOR", "MANAGER"])
+  role?: string;
+
+  @ApiPropertyOptional({ description: "是否激活", example: true })
+  @IsBoolean()
+  @IsOptional()
   isActive?: boolean;
 }
 
