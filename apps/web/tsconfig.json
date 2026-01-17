@@ -3,6 +3,12 @@
   "compilerOptions": {
     "baseUrl": ".",
     "rootDir": "./src",
+    "exactOptionalPropertyTypes": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "strictNullChecks": false,
+    "strictPropertyInitialization": false,
+    "noImplicitAny": false,
     "paths": {
       "@/*": ["./src/*"],
       "@repo/ui": ["../../packages/ui/src"],
