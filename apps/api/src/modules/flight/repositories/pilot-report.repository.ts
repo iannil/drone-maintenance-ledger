@@ -80,6 +80,9 @@ export class PilotReportRepository {
    */
   async create(data: NewPilotReport): Promise<PilotReport> {
     const result = await db.insert(pilotReport).values(data).returning();
+    if (!result[0]) {
+      throw new Error("Failed to create pilot report");
+    }
     return result[0];
   }
 
@@ -89,7 +92,7 @@ export class PilotReportRepository {
   async update(id: string, data: Partial<NewPilotReport>): Promise<PilotReport> {
     const result = await db
       .update(pilotReport)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...data, updatedAt: Date.now() })
       .where(eq(pilotReport.id, id))
       .returning();
 
@@ -106,11 +109,11 @@ export class PilotReportRepository {
   async updateStatus(id: string, status: PilotReport["status"], resolvedBy?: string) {
     const updateData: Partial<NewPilotReport> = {
       status,
-      updatedAt: new Date(),
+      updatedAt: Date.now(),
     };
 
     if (status === "RESOLVED" && resolvedBy) {
-      updateData.resolvedAt = new Date();
+      updateData.resolvedAt = Date.now();
       updateData.resolvedBy = resolvedBy;
     }
 
@@ -136,7 +139,7 @@ export class PilotReportRepository {
       .set({
         workOrderId,
         status: "WORK_ORDER_CREATED",
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(pilotReport.id, reportId))
       .returning();
@@ -154,7 +157,7 @@ export class PilotReportRepository {
   async delete(id: string): Promise<void> {
     await db
       .update(pilotReport)
-      .set({ isActive: false, updatedAt: new Date() })
+      .set({ isActive: false, updatedAt: Date.now() })
       .where(eq(pilotReport.id, id));
   }
 }

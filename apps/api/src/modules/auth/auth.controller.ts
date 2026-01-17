@@ -1,6 +1,7 @@
 import { Controller, Post, Body, UseGuards, Request, Get, Inject } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { IsString, IsOptional, IsEmail, IsNotEmpty } from "class-validator";
+import type { Request as ExpressRequest } from "express";
 
 import { AuthService } from "./auth.service";
 import type { User } from "@repo/db";
@@ -11,14 +12,14 @@ import type { User } from "@repo/db";
 class RegisterDto {
   @IsString()
   @IsNotEmpty()
-  username: string;
+  username!: string;
 
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsString()
   @IsNotEmpty()
-  password: string;
+  password!: string;
 
   @IsString()
   @IsOptional()
@@ -35,11 +36,11 @@ class RegisterDto {
 class LoginDto {
   @IsString()
   @IsNotEmpty()
-  username: string;
+  username!: string;
 
   @IsString()
   @IsNotEmpty()
-  password: string;
+  password!: string;
 }
 
 /**
@@ -79,7 +80,7 @@ export class AuthController {
    */
   @UseGuards(AuthGuard("jwt"))
   @Get("profile")
-  getProfile(@Request() req) {
+  getProfile(@Request() req: ExpressRequest & { user?: unknown }) {
     return req.user;
   }
 }

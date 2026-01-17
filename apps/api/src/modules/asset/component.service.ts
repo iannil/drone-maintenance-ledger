@@ -16,8 +16,8 @@ export interface CreateComponentDto {
   isLifeLimited?: boolean;
   maxFlightHours?: number;
   maxCycles?: number;
-  manufacturedAt?: Date;
-  purchasedAt?: Date;
+  manufacturedAt?: number;
+  purchasedAt?: number;
 }
 
 export interface UpdateComponentDto {
@@ -197,9 +197,7 @@ export class ComponentService {
 
     // Update component status
     await this.componentRepository.update(dto.componentId, {
-      status: "INSTALLED",
-      currentAircraftId: dto.aircraftId,
-      installPosition: dto.location,
+      status: "IN_USE",
     });
 
     return {
@@ -224,24 +222,25 @@ export class ComponentService {
     }
 
     // Check if component is actually installed
-    if (componentData.status !== "INSTALLED") {
+    if (componentData.status !== "IN_USE") {
       throw new ConflictException("Component is not currently installed");
     }
+
+    // Get current installation to record the previous aircraft
+    const currentInstallation = await this.componentRepository.getCurrentInstallation(dto.componentId);
 
     // Close the installation record
     await this.componentRepository.remove(dto.componentId, dto.removeNotes);
 
     // Update component status
     await this.componentRepository.update(dto.componentId, {
-      status: "REMOVED",
-      currentAircraftId: null,
-      installPosition: null,
+      status: "NEW",
     });
 
     return {
       componentId: dto.componentId,
       message: "Component removed successfully",
-      previousAircraftId: componentData.currentAircraftId,
+      previousAircraftId: currentInstallation?.aircraftId ?? null,
     };
   }
 

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { eq, and, isNull, desc, sql } from "drizzle-orm";
 
-import type { Component, NewComponent } from "@repo/db";
+import type { Component, NewComponent, ComponentInstallation } from "@repo/db";
 import { component, componentInstallation } from "@repo/db";
 import { db } from "@repo/db";
 
@@ -51,6 +51,9 @@ export class ComponentRepository {
    */
   async create(data: NewComponent): Promise<Component> {
     const result = await db.insert(component).values(data).returning();
+    if (!result[0]) {
+      throw new Error("Failed to create component");
+    }
     return result[0];
   }
 
@@ -60,7 +63,7 @@ export class ComponentRepository {
   async update(id: string, data: Partial<NewComponent>): Promise<Component> {
     const result = await db
       .update(component)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...data, updatedAt: Date.now() })
       .where(eq(component.id, id))
       .returning();
 
@@ -89,7 +92,7 @@ export class ComponentRepository {
         ...(batteryCycles !== undefined && {
           batteryCycles: sql<number>`${component.batteryCycles} + ${batteryCycles}`,
         }),
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(component.id, id))
       .returning();
@@ -118,7 +121,7 @@ export class ComponentRepository {
   /**
    * Find components currently installed on an aircraft
    */
-  async findInstalledOnAircraft(aircraftId: string): Promise<Array<Component & ComponentInstallation>> {
+  async findInstalledOnAircraft(aircraftId: string) {
     return db
       .select({
         // Component fields
@@ -214,7 +217,7 @@ export class ComponentRepository {
       // Inherit the component's cumulative values at install time
       inheritedFlightHours: comp.totalFlightHours,
       inheritedCycles: comp.totalFlightCycles,
-      installedAt: new Date(),
+      installedAt: Date.now(),
     });
   }
 
@@ -232,7 +235,7 @@ export class ComponentRepository {
     const result = await db
       .update(componentInstallation)
       .set({
-        removedAt: new Date(),
+        removedAt: Date.now(),
         removeNotes: notes || null,
       })
       .where(

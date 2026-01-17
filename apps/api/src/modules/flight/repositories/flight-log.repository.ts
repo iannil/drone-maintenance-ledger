@@ -79,6 +79,9 @@ export class FlightLogRepository {
    */
   async create(data: NewFlightLog): Promise<FlightLog> {
     const result = await db.insert(flightLog).values(data).returning();
+    if (!result[0]) {
+      throw new Error("Failed to create flight log");
+    }
     return result[0];
   }
 
@@ -88,7 +91,7 @@ export class FlightLogRepository {
   async update(id: string, data: Partial<NewFlightLog>): Promise<FlightLog> {
     const result = await db
       .update(flightLog)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...data, updatedAt: Date.now() })
       .where(eq(flightLog.id, id))
       .returning();
 
@@ -105,7 +108,7 @@ export class FlightLogRepository {
   async delete(id: string): Promise<void> {
     await db
       .update(flightLog)
-      .set({ isActive: false, updatedAt: new Date() })
+      .set({ isActive: false, updatedAt: Date.now() })
       .where(eq(flightLog.id, id));
   }
 
@@ -140,7 +143,7 @@ export class FlightLogRepository {
       .set({
         totalFlightHours: sql`${aircraft.totalFlightHours} + ${flightHours}`,
         totalFlightCycles: sql`${aircraft.totalFlightCycles} + ${cycles}`,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(aircraft.id, aircraftId));
 
@@ -163,7 +166,7 @@ export class FlightLogRepository {
         .set({
           totalFlightHours: sql`${component.totalFlightHours} + ${flightHours}`,
           totalFlightCycles: sql`${component.totalFlightCycles} + ${cycles}`,
-          updatedAt: new Date(),
+          updatedAt: Date.now(),
         })
         .where(eq(component.id, comp.id));
     }

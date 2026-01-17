@@ -39,7 +39,7 @@ export interface RecentActivity {
   id: string;
   type: "maintenance" | "flight" | "warning" | "workorder";
   message: string;
-  time: Date;
+  time: number;
   relatedId?: string;
 }
 
@@ -121,13 +121,12 @@ export class StatsService {
     const [flightStats] = await db
       .select({
         totalHours: sql<number>`COALESCE(SUM(${flightLog.flightHours}), 0)`.as("totalHours"),
-        totalCycles: sql<number>`COALESCE(SUM(${flightLog.flightCycles}), 0)`.as("totalCycles"),
+        totalCycles: sql<number>`COALESCE(SUM(${flightLog.takeoffCycles}), 0)`.as("totalCycles"),
       })
       .from(flightLog);
 
     // Get last 30 days flight hours
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
 
     const [recentFlightStats] = await db
       .select({
@@ -214,7 +213,7 @@ export class StatsService {
 
     // Sort by time and limit
     return activities
-      .sort((a, b) => b.time.getTime() - a.time.getTime())
+      .sort((a, b) => b.time - a.time)
       .slice(0, limit);
   }
 

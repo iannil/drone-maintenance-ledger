@@ -13,6 +13,7 @@ import {
   Inject,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import type { Request as ExpressRequest } from "express";
 
 import { UserService, RegisterDto, UpdateUserDto } from "./user.service";
 import { Roles } from "../../common/decorators/roles.decorator";
@@ -37,8 +38,8 @@ export class UserController {
    * Get current user profile
    */
   @Get("me")
-  getProfile(@Request() req) {
-    return this.userService.findById(req.user.id);
+  getProfile(@Request() req: ExpressRequest & { user?: { id: string } }) {
+    return this.userService.findById(req.user!.id);
   }
 
   /**

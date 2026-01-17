@@ -13,6 +13,7 @@ import {
   Inject,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import type { Request as ExpressRequest } from "express";
 
 import {
   WorkOrderService,
@@ -138,10 +139,10 @@ export class WorkOrderController {
   @Roles("ADMIN", "MANAGER", "MECHANIC")
   async complete(
     @Param("id") id: string,
-    @Request() req,
+    @Request() req: ExpressRequest & { user?: { id: string } },
     @Body() body?: { notes?: string },
   ) {
-    return this.workOrderService.complete(id, req.user.id, body?.notes);
+    return this.workOrderService.complete(id, req.user!.id, body?.notes);
   }
 
   /**
@@ -150,8 +151,8 @@ export class WorkOrderController {
    */
   @Post(":id/release")
   @Roles("INSPECTOR", "ADMIN")
-  async release(@Param("id") id: string, @Request() req) {
-    return this.workOrderService.release(id, req.user.id);
+  async release(@Param("id") id: string, @Request() req: ExpressRequest & { user?: { id: string } }) {
+    return this.workOrderService.release(id, req.user!.id);
   }
 
   /**
@@ -225,8 +226,8 @@ export class WorkOrderController {
    */
   @Post("tasks/:taskId/sign-off")
   @Roles("INSPECTOR", "ADMIN")
-  async signOffRiiTask(@Param("taskId") taskId: string, @Request() req) {
-    return this.workOrderService.signOffRiiTask(taskId, req.user.id);
+  async signOffRiiTask(@Param("taskId") taskId: string, @Request() req: ExpressRequest & { user?: { id: string } }) {
+    return this.workOrderService.signOffRiiTask(taskId, req.user!.id);
   }
 
   /**

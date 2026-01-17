@@ -53,6 +53,9 @@ export class WorkOrderTaskRepository {
    */
   async create(data: NewWorkOrderTask): Promise<WorkOrderTask> {
     const result = await db.insert(workOrderTask).values(data).returning();
+    if (!result[0]) {
+      throw new Error("Failed to create work order task");
+    }
     return result[0];
   }
 
@@ -70,7 +73,7 @@ export class WorkOrderTaskRepository {
   async update(id: string, data: Partial<NewWorkOrderTask>): Promise<WorkOrderTask> {
     const result = await db
       .update(workOrderTask)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...data, updatedAt: Date.now() })
       .where(eq(workOrderTask.id, id))
       .returning();
 
@@ -85,13 +88,13 @@ export class WorkOrderTaskRepository {
    * Update task status
    */
   async updateStatus(id: string, status: WorkOrderTask["status"]) {
-    const updateData: Partial<NewWorkOrderTask> = { status, updatedAt: new Date() };
+    const updateData: Partial<NewWorkOrderTask> = { status, updatedAt: Date.now() };
 
     if (status === "IN_PROGRESS" && !updateData.startedAt) {
-      updateData.startedAt = new Date();
+      updateData.startedAt = Date.now();
     }
     if (status === "COMPLETED") {
-      updateData.completedAt = new Date();
+      updateData.completedAt = Date.now();
     }
 
     const result = await db
@@ -117,8 +120,8 @@ export class WorkOrderTaskRepository {
       .set({
         status: "COMPLETED",
         inspectedBy: inspectorId,
-        completedAt: new Date(),
-        updatedAt: new Date(),
+        completedAt: Date.now(),
+        updatedAt: Date.now(),
       })
       .where(eq(workOrderTask.id, id))
       .returning();
@@ -136,7 +139,7 @@ export class WorkOrderTaskRepository {
   async delete(id: string): Promise<void> {
     await db
       .update(workOrderTask)
-      .set({ isActive: false, updatedAt: new Date() })
+      .set({ isActive: false, updatedAt: Date.now() })
       .where(eq(workOrderTask.id, id));
   }
 
@@ -146,7 +149,7 @@ export class WorkOrderTaskRepository {
   async deleteByWorkOrder(workOrderId: string): Promise<void> {
     await db
       .update(workOrderTask)
-      .set({ isActive: false, updatedAt: new Date() })
+      .set({ isActive: false, updatedAt: Date.now() })
       .where(eq(workOrderTask.workOrderId, workOrderId));
   }
 }

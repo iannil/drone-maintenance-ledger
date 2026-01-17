@@ -33,6 +33,9 @@ export class FleetRepository {
    */
   async create(data: NewFleet): Promise<Fleet> {
     const result = await db.insert(fleet).values(data).returning();
+    if (!result[0]) {
+      throw new Error("Failed to create fleet");
+    }
     return result[0];
   }
 
@@ -42,9 +45,12 @@ export class FleetRepository {
   async update(id: string, data: Partial<NewFleet>): Promise<Fleet> {
     const result = await db
       .update(fleet)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...data, updatedAt: Date.now() })
       .where(eq(fleet.id, id))
       .returning();
+    if (!result[0]) {
+      throw new Error(`Fleet with id ${id} not found`);
+    }
     return result[0];
   }
 

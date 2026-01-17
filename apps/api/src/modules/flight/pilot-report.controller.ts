@@ -13,6 +13,7 @@ import {
   Inject,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import type { Request as ExpressRequest } from "express";
 
 import {
   PilotReportService,
@@ -84,8 +85,8 @@ export class PilotReportController {
    * Available to all authenticated users
    */
   @Post()
-  async create(@Request() req, @Body() dto: CreatePilotReportDto) {
-    return this.pilotReportService.create(req.user.id, dto);
+  async create(@Request() req: ExpressRequest & { user?: { id: string } }, @Body() dto: CreatePilotReportDto) {
+    return this.pilotReportService.create(req.user!.id, dto);
   }
 
   /**
@@ -103,8 +104,8 @@ export class PilotReportController {
    */
   @Put(":id/status")
   @Roles("ADMIN", "MANAGER", "MECHANIC", "INSPECTOR")
-  async updateStatus(@Request() req, @Param("id") id: string, @Body() dto: UpdateStatusDto) {
-    return this.pilotReportService.updateStatus(id, req.user.id, dto);
+  async updateStatus(@Request() req: ExpressRequest & { user?: { id: string } }, @Param("id") id: string, @Body() dto: UpdateStatusDto) {
+    return this.pilotReportService.updateStatus(id, req.user!.id, dto);
   }
 
   /**

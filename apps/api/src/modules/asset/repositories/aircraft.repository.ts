@@ -53,6 +53,9 @@ export class AircraftRepository {
    */
   async create(data: NewAircraft): Promise<Aircraft> {
     const result = await db.insert(aircraft).values(data).returning();
+    if (!result[0]) {
+      throw new Error("Failed to create aircraft");
+    }
     return result[0];
   }
 
@@ -62,7 +65,7 @@ export class AircraftRepository {
   async update(id: string, data: Partial<NewAircraft>): Promise<Aircraft> {
     const result = await db
       .update(aircraft)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...data, updatedAt: Date.now() })
       .where(eq(aircraft.id, id))
       .returning();
 
@@ -86,7 +89,7 @@ export class AircraftRepository {
       .set({
         totalFlightHours: sql`${aircraft.totalFlightHours} + ${flightHours}`,
         totalFlightCycles: sql`${aircraft.totalFlightCycles} + ${flightCycles}`,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(aircraft.id, id))
       .returning();
@@ -107,7 +110,7 @@ export class AircraftRepository {
       .set({
         status,
         ...(isAirworthy !== undefined && { isAirworthy }),
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(aircraft.id, id))
       .returning();

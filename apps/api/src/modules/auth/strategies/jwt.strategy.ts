@@ -35,8 +35,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: payload.role as User["role"],
       fullName: "User",
       isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     } as Omit<User, "passwordHash">;
   }
 }

@@ -126,6 +126,9 @@ export class WorkOrderRepository {
    */
   async create(data: NewWorkOrder): Promise<WorkOrder> {
     const result = await db.insert(workOrder).values(data).returning();
+    if (!result[0]) {
+      throw new Error("Failed to create work order");
+    }
     return result[0];
   }
 
@@ -135,7 +138,7 @@ export class WorkOrderRepository {
   async update(id: string, data: Partial<NewWorkOrder>): Promise<WorkOrder> {
     const result = await db
       .update(workOrder)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...data, updatedAt: Date.now() })
       .where(eq(workOrder.id, id))
       .returning();
 
@@ -152,7 +155,7 @@ export class WorkOrderRepository {
   async updateStatus(id: string, status: WorkOrder["status"]) {
     const result = await db
       .update(workOrder)
-      .set({ status, updatedAt: new Date() })
+      .set({ status, updatedAt: Date.now() })
       .where(eq(workOrder.id, id))
       .returning();
 
@@ -171,9 +174,9 @@ export class WorkOrderRepository {
       .update(workOrder)
       .set({
         assignedTo: userId,
-        assignedAt: new Date(),
+        assignedAt: Date.now(),
         status: "OPEN",
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(workOrder.id, id))
       .returning();
@@ -193,8 +196,8 @@ export class WorkOrderRepository {
       .update(workOrder)
       .set({
         status: "IN_PROGRESS",
-        actualStart: new Date(),
-        updatedAt: new Date(),
+        actualStart: Date.now(),
+        updatedAt: Date.now(),
       })
       .where(eq(workOrder.id, id))
       .returning();
@@ -215,10 +218,10 @@ export class WorkOrderRepository {
       .set({
         status: "COMPLETED",
         completedBy,
-        completedAt: new Date(),
-        actualEnd: new Date(),
+        completedAt: Date.now(),
+        actualEnd: Date.now(),
         completionNotes: notes || null,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(workOrder.id, id))
       .returning();
@@ -239,8 +242,8 @@ export class WorkOrderRepository {
       .set({
         status: "RELEASED",
         releasedBy,
-        releasedAt: new Date(),
-        updatedAt: new Date(),
+        releasedAt: Date.now(),
+        updatedAt: Date.now(),
       })
       .where(eq(workOrder.id, id))
       .returning();
@@ -258,7 +261,7 @@ export class WorkOrderRepository {
   async delete(id: string): Promise<void> {
     await db
       .update(workOrder)
-      .set({ isActive: false, updatedAt: new Date() })
+      .set({ isActive: false, updatedAt: Date.now() })
       .where(eq(workOrder.id, id));
   }
 }

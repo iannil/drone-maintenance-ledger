@@ -7,6 +7,7 @@ import { AssetModule } from "./modules/asset/asset.module";
 import { FlightModule } from "./modules/flight/flight.module";
 import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
 import { StatsModule } from "./modules/stats/stats.module";
+import { InventoryModule } from "./modules/inventory/inventory.module";
 
 @Module({
   imports: [
@@ -23,10 +24,7 @@ import { StatsModule } from "./modules/stats/stats.module";
     FlightModule,
     MaintenanceModule,
     StatsModule,
-
-    // TODO: Add more modules as we build them
-    // PlanningModule,
-    // InventoryModule,
+    InventoryModule,
   ],
   controllers: [],
   providers: [],

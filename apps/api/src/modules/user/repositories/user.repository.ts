@@ -54,6 +54,9 @@ export class UserRepository {
       })
       .returning();
 
+    if (!result[0]) {
+      throw new Error("Failed to create user");
+    }
     return result[0];
   }
 
@@ -69,6 +72,9 @@ export class UserRepository {
    */
   async update(id: string, data: Partial<NewUser>): Promise<User> {
     const result = await db.update(user).set(data).where(eq(user.id, id)).returning();
+    if (!result[0]) {
+      throw new Error(`User with id ${id} not found`);
+    }
     return result[0];
   }
 

@@ -15,8 +15,8 @@ export interface CreateWorkOrderDto {
   description?: string;
   reason?: string;
   priority?: WorkOrder["priority"];
-  scheduledStart?: Date;
-  scheduledEnd?: Date;
+  scheduledStart?: number;
+  scheduledEnd?: number;
   assignedTo?: string;
   scheduleId?: string;
 }
@@ -26,8 +26,8 @@ export interface UpdateWorkOrderDto {
   description?: string;
   reason?: string;
   priority?: WorkOrder["priority"];
-  scheduledStart?: Date;
-  scheduledEnd?: Date;
+  scheduledStart?: number;
+  scheduledEnd?: number;
   completionNotes?: string;
   discrepancies?: string;
 }
@@ -138,7 +138,7 @@ export class WorkOrderService {
       orderNumber,
       status: dto.assignedTo ? "OPEN" : "DRAFT",
       priority: dto.priority || "MEDIUM",
-      assignedAt: dto.assignedTo ? new Date() : null,
+      assignedAt: dto.assignedTo ? Date.now() : null,
     });
   }
 

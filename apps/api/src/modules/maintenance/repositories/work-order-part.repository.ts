@@ -36,6 +36,9 @@ export class WorkOrderPartRepository {
    */
   async create(data: NewWorkOrderPart): Promise<WorkOrderPart> {
     const result = await db.insert(workOrderPart).values(data).returning();
+    if (!result[0]) {
+      throw new Error("Failed to create work order part");
+    }
     return result[0];
   }
 

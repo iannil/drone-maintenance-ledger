@@ -10,12 +10,12 @@ export interface CreateFlightLogDto {
   aircraftId: string;
   pilotId: string;
   copilotId?: string;
-  flightDate: Date;
+  flightDate: number;
   flightType: FlightLog["flightType"];
   departureLocation: string;
-  departureTime?: Date;
+  departureTime?: number;
   arrivalLocation?: string;
-  arrivalTime?: Date;
+  arrivalTime?: number;
   flightDuration: number; // minutes
   flightHours: number; // hours
   takeoffCycles?: number;
@@ -29,12 +29,12 @@ export interface CreateFlightLogDto {
 }
 
 export interface UpdateFlightLogDto {
-  flightDate?: Date;
+  flightDate?: number;
   flightType?: FlightLog["flightType"];
   departureLocation?: string;
-  departureTime?: Date;
+  departureTime?: number;
   arrivalLocation?: string;
-  arrivalTime?: Date;
+  arrivalTime?: number;
   flightDuration?: number;
   flightHours?: number;
   takeoffCycles?: number;

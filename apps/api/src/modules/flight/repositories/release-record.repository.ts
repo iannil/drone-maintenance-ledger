@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 
 import type { ReleaseRecord, NewReleaseRecord } from "@repo/db";
 import { releaseRecord } from "@repo/db";
@@ -84,6 +84,9 @@ export class ReleaseRecordRepository {
    */
   async create(data: NewReleaseRecord): Promise<ReleaseRecord> {
     const result = await db.insert(releaseRecord).values(data).returning();
+    if (!result[0]) {
+      throw new Error("Failed to create release record");
+    }
     return result[0];
   }
 
@@ -93,7 +96,7 @@ export class ReleaseRecordRepository {
   async update(id: string, data: Partial<NewReleaseRecord>): Promise<ReleaseRecord> {
     const result = await db
       .update(releaseRecord)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...data, updatedAt: Date.now() })
       .where(eq(releaseRecord.id, id))
       .returning();
 
@@ -114,7 +117,7 @@ export class ReleaseRecordRepository {
       .set({
         supersededBy: newReleaseId,
         isValid: false,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(releaseRecord.id, oldReleaseId))
       .returning();
@@ -134,7 +137,7 @@ export class ReleaseRecordRepository {
       .update(releaseRecord)
       .set({
         signatureHash,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(eq(releaseRecord.id, id))
       .returning();
@@ -153,7 +156,7 @@ export class ReleaseRecordRepository {
   async delete(id: string): Promise<void> {
     await db
       .update(releaseRecord)
-      .set({ isActive: false, updatedAt: new Date() })
+      .set({ isActive: false, updatedAt: Date.now() })
       .where(eq(releaseRecord.id, id));
   }
 }

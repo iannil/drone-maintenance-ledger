@@ -13,6 +13,7 @@ import {
   Inject,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import type { Request as ExpressRequest } from "express";
 
 import {
   ReleaseRecordService,
@@ -103,8 +104,8 @@ export class ReleaseRecordController {
    */
   @Post()
   @Roles("ADMIN", "MANAGER", "INSPECTOR")
-  async create(@Request() req, @Body() dto: CreateReleaseRecordDto) {
-    return this.releaseRecordService.create(req.user.id, dto);
+  async create(@Request() req: ExpressRequest & { user?: { id: string } }, @Body() dto: CreateReleaseRecordDto) {
+    return this.releaseRecordService.create(req.user!.id, dto);
   }
 
   /**
