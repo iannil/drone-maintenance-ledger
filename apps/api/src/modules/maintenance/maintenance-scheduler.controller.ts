@@ -4,7 +4,8 @@
  * API endpoints for maintenance scheduling operations
  */
 
-import { Controller, Get, Post, Body, Param, Query, HttpException, HttpStatus, Inject } from "@nestjs/common";
+import { Controller, Get, Post, Body, Param, Query, HttpException, HttpStatus, Inject, UseGuards } from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
 import {
   ApiTags,
   ApiOperation,
@@ -14,9 +15,12 @@ import {
   ApiBody,
   ApiProperty,
   ApiPropertyOptional,
+  ApiBearerAuth,
 } from "@nestjs/swagger";
 
 import { MaintenanceSchedulerService, MaintenanceAlert, SchedulerRunResult } from "./maintenance-scheduler.service";
+import { Roles } from "../../common/decorators/roles.decorator";
+import { RolesGuard } from "../../common/guards/roles.guard";
 import { TriggerCalculationService, TriggerCalculationResult } from "./trigger-calculation.service";
 import { MaintenanceProgramRepository } from "./repositories/maintenance-program.repository";
 import { MaintenanceTriggerRepository } from "./repositories/maintenance-trigger.repository";
@@ -122,7 +126,9 @@ class MaintenanceAlertDto {
 }
 
 @ApiTags("维保调度 (Maintenance Scheduler)")
+@ApiBearerAuth()
 @Controller("maintenance-scheduler")
+@UseGuards(AuthGuard("jwt"), RolesGuard)
 export class MaintenanceSchedulerController {
   constructor(
     @Inject(MaintenanceSchedulerService)
@@ -143,7 +149,8 @@ export class MaintenanceSchedulerController {
    * Run the scheduler to check and update all maintenance schedules
    */
   @Post("run")
-  @ApiOperation({ summary: "运行调度器", description: "检查并更新所有维保计划状态" })
+  @Roles("ADMIN", "MANAGER")
+  @ApiOperation({ summary: "运行调度器", description: "检查并更新所有维保计划状态（需要 ADMIN 或 MANAGER 角色）" })
   @ApiResponse({ status: 200, description: "运行成功", type: SchedulerRunResultDto })
   async runScheduler(): Promise<SchedulerRunResult> {
     return this.schedulerService.runScheduler();
@@ -153,7 +160,8 @@ export class MaintenanceSchedulerController {
    * Create work orders for all due schedules
    */
   @Post("create-work-orders")
-  @ApiOperation({ summary: "创建到期工单", description: "为所有到期的维保计划创建工单" })
+  @Roles("ADMIN", "MANAGER")
+  @ApiOperation({ summary: "创建到期工单", description: "为所有到期的维保计划创建工单（需要 ADMIN 或 MANAGER 角色）" })
   @ApiBody({ type: CreateWorkOrdersSwaggerDto, required: false })
   @ApiResponse({
     status: 200,
@@ -205,7 +213,8 @@ export class MaintenanceSchedulerController {
    * Initialize schedules for an aircraft
    */
   @Post("aircraft/:aircraftId/initialize")
-  @ApiOperation({ summary: "初始化飞行器维保计划", description: "根据维保程序为飞行器创建初始维保计划" })
+  @Roles("ADMIN", "MANAGER")
+  @ApiOperation({ summary: "初始化飞行器维保计划", description: "根据维保程序为飞行器创建初始维保计划（需要 ADMIN 或 MANAGER 角色）" })
   @ApiParam({ name: "aircraftId", description: "飞行器 ID" })
   @ApiResponse({
     status: 200,
@@ -232,7 +241,8 @@ export class MaintenanceSchedulerController {
    * Complete a maintenance schedule
    */
   @Post("schedules/:scheduleId/complete")
-  @ApiOperation({ summary: "完成维保计划", description: "标记维保计划为已完成，并自动创建下一周期计划" })
+  @Roles("ADMIN", "MANAGER", "MECHANIC", "INSPECTOR")
+  @ApiOperation({ summary: "完成维保计划", description: "标记维保计划为已完成，并自动创建下一周期计划（需要 ADMIN、MANAGER、MECHANIC 或 INSPECTOR 角色）" })
   @ApiParam({ name: "scheduleId", description: "计划 ID" })
   @ApiBody({ type: CompleteScheduleSwaggerDto, required: false })
   @ApiResponse({ status: 200, description: "完成成功" })
@@ -289,7 +299,8 @@ export class MaintenanceSchedulerController {
    * Create a maintenance program
    */
   @Post("programs")
-  @ApiOperation({ summary: "创建维保程序", description: "创建新的维保程序（维保大纲）" })
+  @Roles("ADMIN", "MANAGER")
+  @ApiOperation({ summary: "创建维保程序", description: "创建新的维保程序（维保大纲）（需要 ADMIN 或 MANAGER 角色）" })
   @ApiBody({ type: CreateProgramSwaggerDto })
   @ApiResponse({ status: 201, description: "创建成功" })
   async createProgram(@Body() data: NewMaintenanceProgram): Promise<MaintenanceProgram> {
@@ -358,7 +369,8 @@ export class MaintenanceSchedulerController {
    * Create a maintenance trigger
    */
   @Post("triggers")
-  @ApiOperation({ summary: "创建触发器", description: "创建新的维保触发器（如：每50小时检查）" })
+  @Roles("ADMIN", "MANAGER")
+  @ApiOperation({ summary: "创建触发器", description: "创建新的维保触发器（如：每50小时检查）（需要 ADMIN 或 MANAGER 角色）" })
   @ApiBody({ type: CreateTriggerSwaggerDto })
   @ApiResponse({ status: 201, description: "创建成功" })
   async createTrigger(@Body() data: NewMaintenanceTrigger): Promise<MaintenanceTrigger> {

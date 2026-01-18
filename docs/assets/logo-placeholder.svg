@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E40AF;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="60" cy="60" r="56" fill="url(#grad1)"/>
+
+  <!-- Drone body -->
+  <ellipse cx="60" cy="60" rx="15" ry="8" fill="#fff"/>
+
+  <!-- Drone arms -->
+  <line x1="45" y1="50" x2="30" y2="35" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <line x1="75" y1="50" x2="90" y2="35" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <line x1="45" y1="70" x2="30" y2="85" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <line x1="75" y1="70" x2="90" y2="85" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Propellers -->
+  <circle cx="30" cy="35" r="10" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4,2"/>
+  <circle cx="90" cy="35" r="10" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4,2"/>
+  <circle cx="30" cy="85" r="10" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4,2"/>
+  <circle cx="90" cy="85" r="10" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4,2"/>
+
+  <!-- Maintenance wrench icon -->
+  <g transform="translate(52, 52) scale(0.6)">
+    <path d="M20 4L16 8L20 12L24 8L20 4Z" fill="#10B981"/>
+    <path d="M8 16L4 20L8 24L12 20L8 16Z" fill="#10B981"/>
+    <line x1="12" y1="12" x2="16" y2="16" stroke="#10B981" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>
