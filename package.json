@@ -16,9 +16,11 @@
     "db:studio": "pnpm --filter @repo/db db:studio"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@turbo/gen": "^2.3.3",
     "@types/bcrypt": "^5.0.2",
     "better-sqlite3": "^12.6.0",
+    "tsx": "^4.19.2",
     "turbo": "^2.3.3",
     "typescript": "^5.7.2"
   },
