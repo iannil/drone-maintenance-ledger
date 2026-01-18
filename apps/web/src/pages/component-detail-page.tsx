@@ -31,6 +31,9 @@ import {
   COMPONENT_STATUS_LABELS,
   STATUS_DISPLAY_MAP,
 } from "../services/component.service";
+import { FlightLog, FLIGHT_TYPE_LABELS } from "../services/flight-log.service";
+import { WorkOrder, WORK_ORDER_TYPE_LABELS } from "../services/work-order.service";
+import { User } from "../services/user.service";
 
 /**
  * Component detail page with comprehensive history tracking
@@ -61,45 +64,30 @@ export function ComponentDetailPage() {
     loadComponent();
   }, [id]);
 
-  // Mock installation history - TODO: Add API endpoint for installation history
-  const installationHistory = [
-    {
-      id: "inst-001",
-      action: "INSTALL",
-      aircraftId: "ac-001",
-      aircraftReg: "B-7011U",
-      location: "左前",
-      date: "2024-03-20",
-      flightHoursAtInstall: 0,
-      technician: "李四",
-      reason: "新机装机",
-    },
-  ];
+  // Installation history - component service doesn't provide installation details directly
+  const installationHistory: {
+    id: string;
+    action: "INSTALL" | "REMOVE";
+    aircraftId: string;
+    aircraftReg: string;
+    location: string;
+    date: string;
+    flightHoursAtInstall: number;
+    technician: string;
+    reason: string;
+  }[] = [];
 
-  // Mock maintenance history - TODO: Add API endpoint for maintenance history
-  const maintenanceHistory = [
-    {
-      id: "maint-001",
-      date: "2026-01-10",
-      type: "定期检查",
-      description: "100小时检查：轴承润滑，螺丝紧固",
-      result: "正常",
-      technician: "张三",
-    },
-  ];
+  // Flight logs and work orders - would require component installation API
+  const flightLogs: FlightLog[] = [];
+  const workOrders: WorkOrder[] = [];
+  const pilots = new Map<string, User>();
 
-  // Mock flight logs - TODO: Add API endpoint for flight logs
-  const recentFlights = [
-    {
-      id: "flight-001",
-      date: "2026-01-15",
-      aircraftReg: "B-7011U",
-      pilot: "张三",
-      duration: "1h 25m",
-      flightHours: 1.42,
-      purpose: "电力巡检",
-    },
-  ];
+  // Helper functions
+  const formatFlightDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
+  };
 
   if (isLoading) {
     return (
@@ -477,7 +465,9 @@ export function ComponentDetailPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>维保记录</CardTitle>
-                  <CardDescription>该零部件的所有维护保养记录</CardDescription>
+                  <CardDescription>
+                    该零部件的维护保养记录
+                  </CardDescription>
                 </div>
                 <Button variant="outline" size="sm">
                   <Wrench className="w-4 h-4 mr-2" />
@@ -486,40 +476,10 @@ export function ComponentDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {maintenanceHistory.map((record) => (
-                  <div key={record.id} className="flex gap-4 p-4 rounded-lg border">
-                    <div className="w-12 h-12 rounded-lg bg-muted flex flex-col items-center justify-center">
-                      <span className="text-xs font-medium">
-                        {new Date(record.date).toLocaleDateString("zh-CN", { month: "short" })}
-                      </span>
-                      <span className="text-lg font-bold">
-                        {new Date(record.date).getDate()}
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium">{record.type}</p>
-                        <Badge
-                          variant={record.result === "正常" ? "default" : "destructive"}
-                          className="text-xs bg-serviceable text-serviceable"
-                        >
-                          {record.result}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{record.description}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        技术员: {record.technician}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-
-                {maintenanceHistory.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    暂无维保记录
-                  </div>
-                )}
+              <div className="text-center py-8 text-muted-foreground">
+                {component?.status === "IN_USE"
+                  ? "维保记录需要从工单系统获取"
+                  : "零部件未安装，暂无维保记录"}
               </div>
             </CardContent>
           </Card>
@@ -533,43 +493,16 @@ export function ComponentDetailPage() {
                 <div>
                   <CardTitle>飞行记录</CardTitle>
                   <CardDescription>
-                    该零部件参与的所有飞行记录
+                    该零部件参与的飞行记录
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {recentFlights.map((flight) => (
-                  <div
-                    key={flight.id}
-                    className="flex items-center justify-between p-4 rounded-lg border"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Activity className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-medium">{flight.purpose}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {flight.date} · {flight.aircraftReg} · 飞行员: {flight.pilot}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">{flight.duration}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {flight.flightHours}h
-                      </p>
-                    </div>
-                  </div>
-                ))}
-
-                {recentFlights.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    暂无飞行记录
-                  </div>
-                )}
+              <div className="text-center py-8 text-muted-foreground">
+                {component?.status === "IN_USE"
+                  ? "飞行记录需要从安装信息获取"
+                  : "零部件未安装，暂无飞行记录"}
               </div>
             </CardContent>
           </Card>

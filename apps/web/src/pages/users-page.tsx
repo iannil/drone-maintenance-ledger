@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Plus,
   Search,
-  User,
+  User as UserIcon,
   Mail,
   Shield,
   MoreHorizontal,
@@ -13,7 +13,9 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  Loader2,
 } from "lucide-react";
+import { userService, User } from "../services/user.service";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
@@ -59,101 +61,6 @@ const USER_STATUS = {
   PENDING: { label: "待激活", color: "bg-yellow-100 text-yellow-700", icon: Clock },
 };
 
-// Mock users
-const MOCK_USERS = [
-  {
-    id: "user-001",
-    username: "zhangsan",
-    fullName: "张三",
-    email: "zhangsan@example.com",
-    role: "MECHANIC",
-    status: "ACTIVE",
-    department: "维修部",
-    phone: "13800138001",
-    license: "CAAC-M-2021001",
-    lastLogin: "2026-01-16T09:30:00",
-    createdAt: "2025-06-15T10:00:00",
-  },
-  {
-    id: "user-002",
-    username: "lisi",
-    fullName: "李四",
-    email: "lisi@example.com",
-    role: "INSPECTOR",
-    status: "ACTIVE",
-    department: "维修部",
-    phone: "13800138002",
-    license: "CAAC-I-2020001",
-    lastLogin: "2026-01-16T08:15:00",
-    createdAt: "2025-05-20T14:00:00",
-  },
-  {
-    id: "user-003",
-    username: "wangwu",
-    fullName: "王五",
-    email: "wangwu@example.com",
-    role: "PILOT",
-    status: "ACTIVE",
-    department: "飞行部",
-    phone: "13800138003",
-    license: "CAAC-U-2021002",
-    lastLogin: "2026-01-15T18:45:00",
-    createdAt: "2025-07-01T09:00:00",
-  },
-  {
-    id: "user-004",
-    username: "zhaoliu",
-    fullName: "赵六",
-    email: "zhaoliu@example.com",
-    role: "MANAGER",
-    status: "ACTIVE",
-    department: "运营部",
-    phone: "13800138004",
-    license: null,
-    lastLogin: "2026-01-16T07:00:00",
-    createdAt: "2025-03-10T11:00:00",
-  },
-  {
-    id: "user-005",
-    username: "admin",
-    fullName: "系统管理员",
-    email: "admin@example.com",
-    role: "ADMIN",
-    status: "ACTIVE",
-    department: "IT部",
-    phone: "13800138000",
-    license: null,
-    lastLogin: "2026-01-16T10:00:00",
-    createdAt: "2025-01-01T08:00:00",
-  },
-  {
-    id: "user-006",
-    username: "feiqi",
-    fullName: "飞七",
-    email: "feiqi@example.com",
-    role: "PILOT",
-    status: "PENDING",
-    department: "飞行部",
-    phone: "13800138005",
-    license: "CAAC-U-2022001",
-    lastLogin: null,
-    createdAt: "2026-01-10T16:00:00",
-  },
-  {
-    id: "user-007",
-    username: "weiba",
-    fullName: "维修八",
-    email: "weiba@example.com",
-    role: "MECHANIC",
-    status: "INACTIVE",
-    department: "维修部",
-    phone: "13800138006",
-    license: "CAAC-M-2020002",
-    lastLogin: "2025-12-01T10:00:00",
-    createdAt: "2025-04-15T14:00:00",
-  },
-];
-
 interface NewUser {
   username: string;
   fullName: string;
@@ -170,13 +77,14 @@ interface NewUser {
  */
 export function UsersPage() {
   // State
-  const [users, setUsers] = useState(MOCK_USERS);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showNewUserDialog, setShowNewUserDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<typeof MOCK_USERS[0] | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [newUser, setNewUser] = useState<NewUser>({
     username: "",
     fullName: "",
@@ -188,16 +96,35 @@ export function UsersPage() {
     status: "ACTIVE",
   });
 
+  // Load users on mount
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        setLoading(true);
+        const data = await userService.list();
+        setUsers(data);
+      } catch (error) {
+        console.error("Failed to load users:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadUsers();
+  }, []);
+
   // Filter users
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       const matchesSearch =
-        user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchQuery.toLowerCase());
+        user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (user.employeeId?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
 
       const matchesRole = roleFilter === "all" || user.role === roleFilter;
-      const matchesStatus = statusFilter === "all" || user.status === statusFilter;
+
+      // Map isActive boolean to status filter
+      const userStatus = user.isActive ? "ACTIVE" : "INACTIVE";
+      const matchesStatus = statusFilter === "all" || userStatus === statusFilter;
 
       return matchesSearch && matchesRole && matchesStatus;
     });
@@ -206,11 +133,10 @@ export function UsersPage() {
   // Calculate statistics
   const stats = useMemo(() => {
     const total = users.length;
-    const active = users.filter((u) => u.status === "ACTIVE").length;
-    const pending = users.filter((u) => u.status === "PENDING").length;
-    const inactive = users.filter((u) => u.status === "INACTIVE").length;
+    const active = users.filter((u) => u.isActive).length;
+    const inactive = users.filter((u) => !u.isActive).length;
 
-    return { total, active, pending, inactive };
+    return { total, active, pending: 0, inactive };
   }, [users]);
 
   // Get role info
@@ -234,19 +160,20 @@ export function UsersPage() {
   const handleCreateUser = () => {
     console.log("Create user:", newUser);
     // TODO: API call to create user
+    const now = Date.now();
     setUsers((prev) => [
       {
-        id: `user-${Date.now()}`,
-        username: newUser.username,
-        fullName: newUser.fullName,
+        id: `user-${now}`,
+        name: newUser.fullName,
         email: newUser.email,
-        role: newUser.role as any,
-        status: newUser.status as any,
-        department: newUser.department,
-        phone: newUser.phone,
-        license: newUser.license || null,
-        lastLogin: null,
-        createdAt: new Date().toISOString(),
+        role: newUser.role as User["role"],
+        isActive: newUser.status === "ACTIVE",
+        department: newUser.department || null,
+        phone: newUser.phone || null,
+        employeeId: null,
+        licenseNumber: newUser.license || null,
+        createdAt: now,
+        updatedAt: now,
       },
       ...prev,
     ]);
@@ -275,14 +202,22 @@ export function UsersPage() {
   };
 
   // Toggle user status
-  const toggleUserStatus = (user: typeof MOCK_USERS[0]) => {
-    const newStatus = user.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+  const toggleUserStatus = (user: User) => {
     setUsers((prev) =>
       prev.map((u) =>
-        u.id === user.id ? { ...u, status: newStatus as any } : u
+        u.id === user.id ? { ...u, isActive: !u.isActive } : u
       )
     );
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -451,7 +386,7 @@ export function UsersPage() {
                     状态
                   </th>
                   <th className="text-left py-3 px-4 font-medium text-sm text-muted-foreground">
-                    最后登录
+                    更新时间
                   </th>
                   <th className="text-right py-3 px-4 font-medium text-sm text-muted-foreground">
                     操作
@@ -470,7 +405,8 @@ export function UsersPage() {
                 ) : (
                   filteredUsers.map((user) => {
                     const roleInfo = getRoleInfo(user.role);
-                    const statusInfo = getStatusInfo(user.status);
+                    const userStatus = user.isActive ? "ACTIVE" : "INACTIVE";
+                    const statusInfo = getStatusInfo(userStatus);
                     const StatusIcon = statusInfo.icon;
 
                     return (
@@ -478,27 +414,27 @@ export function UsersPage() {
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
                             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                              <User className="h-5 w-5 text-primary" />
+                              <UserIcon className="h-5 w-5 text-primary" />
                             </div>
                             <div>
-                              <p className="font-medium">{user.fullName}</p>
-                              <p className="text-sm text-muted-foreground">@{user.username}</p>
+                              <p className="font-medium">{user.name}</p>
+                              <p className="text-sm text-muted-foreground">{user.employeeId || user.email}</p>
                             </div>
                           </div>
                         </td>
                         <td className="py-3 px-4">
                           <Badge className={roleInfo.color}>{roleInfo.label}</Badge>
                         </td>
-                        <td className="py-3 px-4 text-sm">{user.department}</td>
+                        <td className="py-3 px-4 text-sm">{user.department || "-"}</td>
                         <td className="py-3 px-4 text-sm">
                           <div className="flex items-center gap-2 text-muted-foreground">
                             <Mail className="h-3 w-3" />
                             {user.email}
                           </div>
-                          <div className="text-muted-foreground">{user.phone}</div>
+                          <div className="text-muted-foreground">{user.phone || "-"}</div>
                         </td>
                         <td className="py-3 px-4 text-sm font-mono">
-                          {user.license || "-"}
+                          {user.licenseNumber || "-"}
                         </td>
                         <td className="py-3 px-4">
                           <Badge className={statusInfo.color}>
@@ -507,16 +443,14 @@ export function UsersPage() {
                           </Badge>
                         </td>
                         <td className="py-3 px-4 text-sm text-muted-foreground">
-                          {user.lastLogin
-                            ? new Date(user.lastLogin).toLocaleDateString("zh-CN")
-                            : "-"}
+                          {new Date(user.updatedAt).toLocaleDateString("zh-CN")}
                         </td>
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="ghost" size="icon" className="h-8 w-8">
                               <Edit2 className="h-4 w-4" />
                             </Button>
-                            {user.status === "ACTIVE" ? (
+                            {user.isActive ? (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -716,7 +650,7 @@ export function UsersPage() {
           <DialogHeader>
             <DialogTitle>确认删除用户</DialogTitle>
             <DialogDescription>
-              您确定要删除用户 "{selectedUser?.fullName}" 吗？此操作不可撤销。
+              您确定要删除用户 "{selectedUser?.name}" 吗？此操作不可撤销。
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-start gap-2 p-3 bg-red-50 rounded text-red-800 text-sm">

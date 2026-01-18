@@ -3,7 +3,7 @@
  * 供应商管理页面
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   Search,
@@ -20,156 +20,42 @@ import {
   XCircle,
   Clock,
   Star,
+  Loader2,
 } from "lucide-react";
 
-// Mock data
-const MOCK_SUPPLIERS = [
-  {
-    id: "SUP-001",
-    name: "大疆创新科技有限公司",
-    code: "DJISUP",
-    type: "MANUFACTURER",
-    status: "ACTIVE",
-    contact: {
-      primary: "张经理",
-      phone: "0755-12345678",
-      email: "zhang@dji.com",
-    },
-    address: {
-      country: "中国",
-      province: "广东省",
-      city: "深圳市",
-      street: "南山区仙茶大厦",
-      postalCode: "518057",
-    },
-    categories: ["无人机整机", "零部件", "售后服务"],
-    paymentTerms: "月结30天",
-    deliveryTerms: "FOB 深圳",
-    taxId: "91440300123456789X",
-    rating: 5,
-    totalOrders: 156,
-    totalAmount: 8500000,
-    lastOrderDate: "2025-01-10T10:30:00",
-    notes: "授权一级经销商，提供原厂保修",
-    createdAt: "2023-01-15T00:00:00",
-  },
-  {
-    id: "SUP-002",
-    name: "雷霆航空器材有限公司",
-    code: "THAVI",
-    type: "DISTRIBUTOR",
-    status: "ACTIVE",
-    contact: {
-      primary: "李主管",
-      phone: "021-87654321",
-      email: "li@thunder-aviation.com",
-    },
-    address: {
-      country: "中国",
-      province: "上海市",
-      city: "上海市",
-      street: "浦东新区张江高科",
-      postalCode: "201203",
-    },
-    categories: ["零部件", "维修服务"],
-    paymentTerms: "货到付款",
-    deliveryTerms: "EXW 上海",
-    taxId: "91310000987654321Y",
-    rating: 4,
-    totalOrders: 89,
-    totalAmount: 2100000,
-    lastOrderDate: "2025-01-08T14:20:00",
-    notes: "反应迅速，质量可靠",
-    createdAt: "2023-03-20T00:00:00",
-  },
-  {
-    id: "SUP-003",
-    name: "蓝天电池科技有限公司",
-    code: "SKYBATT",
-    type: "SPECIALIST",
-    status: "ACTIVE",
-    contact: {
-      primary: "王工",
-      phone: "0571-23456789",
-      email: "wang@skybattery.com",
-    },
-    address: {
-      country: "中国",
-      province: "浙江省",
-      city: "杭州市",
-      street: "滨江区物联网街",
-      postalCode: "310051",
-    },
-    categories: ["电池", "充电设备"],
-    paymentTerms: "月结45天",
-    deliveryTerms: "CIF 杭州",
-    taxId: "91330100112233445Z",
-    rating: 4,
-    totalOrders: 234,
-    totalAmount: 3200000,
-    lastOrderDate: "2025-01-12T09:15:00",
-    notes: "专业电池供应商，提供定制化解决方案",
-    createdAt: "2022-11-10T00:00:00",
-  },
-  {
-    id: "SUP-004",
-    name: "迅腾物流科技有限公司",
-    code: "SENTLOG",
-    type: "SERVICE",
-    status: "ACTIVE",
-    contact: {
-      primary: "赵经理",
-      phone: "010-56789012",
-      email: "zhao@sentlog.com",
-    },
-    address: {
-      country: "中国",
-      province: "北京市",
-      city: "北京市",
-      street: "朝阳区望京SOHO",
-      postalCode: "100102",
-    },
-    categories: ["物流服务", "仓储服务"],
-    paymentTerms: "月结30天",
-    deliveryTerms: "DDP",
-    taxId: "91110000998877665A",
-    rating: 3,
-    totalOrders: 45,
-    totalAmount: 450000,
-    lastOrderDate: "2025-01-05T16:30:00",
-    notes: "提供专业物流服务",
-    createdAt: "2024-01-05T00:00:00",
-  },
-  {
-    id: "SUP-005",
-    name: "亚太航空材料有限公司",
-    code: "APAVMAT",
-    type: "DISTRIBUTOR",
-    status: "INACTIVE",
-    contact: {
-      primary: "陈经理",
-      phone: "852-23456789",
-      email: "chan@ap-aviation.com",
-    },
-    address: {
-      country: "中国香港",
-      province: "香港",
-      city: "香港",
-      street: "九龙观塘工业区",
-      postalCode: "00000",
-    },
-    categories: ["复合材料", "航空材料"],
-    paymentTerms: "T/T 50%预付",
-    deliveryTerms: "CIF 香港",
-    taxId: "HK12345678",
-    rating: 2,
-    totalOrders: 12,
-    totalAmount: 180000,
-    lastOrderDate: "2024-10-15T11:00:00",
-    notes: "合作暂停",
-    createdAt: "2023-06-15T00:00:00",
-  },
-];
+// TODO: 后端 API 尚未实现，需要创建 supplierService 并连接后端接口
+// TODO: Backend API not implemented yet, need to create supplierService and connect to backend endpoints
+
+/** Supplier type definition */
+interface Supplier {
+  id: string;
+  name: string;
+  code: string;
+  type: string;
+  status: string;
+  contact: {
+    primary: string;
+    phone: string;
+    email: string;
+  };
+  address: {
+    country: string;
+    province: string;
+    city: string;
+    street: string;
+    postalCode: string;
+  };
+  categories: string[];
+  paymentTerms: string;
+  deliveryTerms: string;
+  taxId: string;
+  rating: number;
+  totalOrders: number;
+  totalAmount: number;
+  lastOrderDate: string;
+  notes: string;
+  createdAt: string;
+}
 
 const SUPPLIER_TYPE_LABELS = {
   MANUFACTURER: { label: "制造商", color: "bg-blue-100 text-blue-700" },
@@ -195,15 +81,39 @@ const CATEGORY_OPTIONS = [
 ];
 
 export function SuppliersPage() {
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [selectedStatus, setSelectedStatus] = useState("ALL");
   const [showFormDialog, setShowFormDialog] = useState(false);
-  const [selectedSupplier, setSelectedSupplier] = useState<typeof MOCK_SUPPLIERS[0] | null>(null);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [sortBy, setSortBy] = useState<"name" | "rating" | "orders">("name");
 
-  const filteredSuppliers = [...MOCK_SUPPLIERS]
+  // TODO: 后端 API 实现后，替换为真实的 API 调用
+  // TODO: Replace with real API call after backend implementation
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      setLoading(true);
+      try {
+        // TODO: 替换为 supplierService.getAll() 调用
+        // Simulating API call delay
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        // Return empty array until backend API is implemented
+        setSuppliers([]);
+      } catch (error) {
+        console.error("Failed to fetch suppliers:", error);
+        setSuppliers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSuppliers();
+  }, []);
+
+  const filteredSuppliers = [...suppliers]
     .filter((supplier) => {
       const matchesSearch =
         supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -221,12 +131,12 @@ export function SuppliersPage() {
       return 0;
     });
 
-  const handleEdit = (supplier: typeof MOCK_SUPPLIERS[0]) => {
+  const handleEdit = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
     setShowFormDialog(true);
   };
 
-  const handleDelete = (supplier: typeof MOCK_SUPPLIERS[0]) => {
+  const handleDelete = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
     setShowDeleteDialog(true);
   };
@@ -278,7 +188,7 @@ export function SuppliersPage() {
             </div>
             <div>
               <p className="text-sm text-slate-500">供应商总数</p>
-              <p className="text-2xl font-bold text-slate-900">{MOCK_SUPPLIERS.length}</p>
+              <p className="text-2xl font-bold text-slate-900">{suppliers.length}</p>
             </div>
           </div>
         </div>
@@ -290,7 +200,7 @@ export function SuppliersPage() {
             <div>
               <p className="text-sm text-slate-500">合作中</p>
               <p className="text-2xl font-bold text-slate-900">
-                {MOCK_SUPPLIERS.filter((s) => s.status === "ACTIVE").length}
+                {suppliers.filter((s) => s.status === "ACTIVE").length}
               </p>
             </div>
           </div>
@@ -303,7 +213,7 @@ export function SuppliersPage() {
             <div>
               <p className="text-sm text-slate-500">总订单数</p>
               <p className="text-2xl font-bold text-slate-900">
-                {MOCK_SUPPLIERS.reduce((sum, s) => sum + s.totalOrders, 0)}
+                {suppliers.reduce((sum, s) => sum + s.totalOrders, 0)}
               </p>
             </div>
           </div>
@@ -316,7 +226,9 @@ export function SuppliersPage() {
             <div>
               <p className="text-sm text-slate-500">平均评分</p>
               <p className="text-2xl font-bold text-slate-900">
-                {(MOCK_SUPPLIERS.reduce((sum, s) => sum + s.rating, 0) / MOCK_SUPPLIERS.length).toFixed(1)}
+                {suppliers.length > 0
+                  ? (suppliers.reduce((sum, s) => sum + s.rating, 0) / suppliers.length).toFixed(1)
+                  : "-"}
               </p>
             </div>
           </div>
@@ -372,130 +284,152 @@ export function SuppliersPage() {
       </div>
 
       {/* Supplier List */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {filteredSuppliers.map((supplier) => {
-          const statusConfig = STATUS_CONFIG[supplier.status as keyof typeof STATUS_CONFIG];
-          const StatusIcon = statusConfig.icon;
-          const typeConfig = SUPPLIER_TYPE_LABELS[supplier.type as keyof typeof SUPPLIER_TYPE_LABELS];
-
-          return (
-            <div key={supplier.id} className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Building className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">{supplier.name}</h3>
-                    <p className="text-sm text-slate-500">{supplier.code}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${
-                    typeConfig.color
-                  }`}>
-                    {typeConfig.label}
-                  </span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded flex items-center gap-1 ${
-                    statusConfig.color
-                  }`}>
-                    <StatusIcon className="w-3 h-3" />
-                    {statusConfig.label}
-                  </span>
-                </div>
-              </div>
-
-              {/* Rating */}
-              <div className="flex items-center gap-1 mb-4">
-                {renderStars(supplier.rating)}
-                <span className="ml-2 text-sm text-slate-500">({supplier.rating}.0)</span>
-              </div>
-
-              {/* Contact Info */}
-              <div className="space-y-2 text-sm mb-4">
-                <div className="flex items-center gap-2 text-slate-600">
-                  <User className="w-4 h-4 text-slate-400" />
-                  <span>联系人: {supplier.contact.primary}</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-600">
-                  <Phone className="w-4 h-4 text-slate-400" />
-                  <span>{supplier.contact.phone}</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-600">
-                  <Mail className="w-4 h-4 text-slate-400" />
-                  <span>{supplier.contact.email}</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-600">
-                  <MapPin className="w-4 h-4 text-slate-400" />
-                  <span>
-                    {supplier.address.city} {supplier.address.province} {supplier.address.country}
-                  </span>
-                </div>
-              </div>
-
-              {/* Categories */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                {supplier.categories.map((category) => (
-                  <span
-                    key={category}
-                    className="px-2 py-1 text-xs bg-slate-100 text-slate-700 rounded"
-                  >
-                    {category}
-                  </span>
-                ))}
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                <div>
-                  <p className="text-slate-500">订单数量</p>
-                  <p className="font-medium text-slate-900">{supplier.totalOrders}</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">采购金额</p>
-                  <p className="font-medium text-slate-900">¥{(supplier.totalAmount / 10000).toFixed(1)}万</p>
-                </div>
-              </div>
-
-              {/* Notes */}
-              {supplier.notes && (
-                <div className="bg-slate-50 rounded-lg p-3 mb-4">
-                  <p className="text-sm text-slate-600">{supplier.notes}</p>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-                <span className="text-xs text-slate-500">
-                  最后订单: {new Date(supplier.lastOrderDate).toLocaleDateString("zh-CN")}
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleEdit(supplier)}
-                    className="p-2 hover:bg-slate-100 rounded-lg"
-                    title="编辑"
-                  >
-                    <Edit className="w-4 h-4 text-slate-600" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(supplier)}
-                    className="p-2 hover:bg-red-100 rounded-lg"
-                    title="删除"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-600" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {filteredSuppliers.length === 0 && (
+      {loading ? (
+        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+          <Loader2 className="w-12 h-12 text-blue-500 mx-auto mb-4 animate-spin" />
+          <p className="text-slate-500">加载供应商数据中...</p>
+        </div>
+      ) : suppliers.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
           <Building className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-          <p className="text-slate-500">没有找到匹配的供应商</p>
+          <p className="text-lg font-medium text-slate-700 mb-2">暂无供应商数据</p>
+          <p className="text-slate-500 mb-4">请点击"新增供应商"按钮添加第一个供应商</p>
+          <button
+            onClick={handleNewSupplier}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            <Plus className="w-4 h-4" />
+            <span>新增供应商</span>
+          </button>
         </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {filteredSuppliers.map((supplier) => {
+              const statusConfig = STATUS_CONFIG[supplier.status as keyof typeof STATUS_CONFIG];
+              const StatusIcon = statusConfig?.icon || CheckCircle;
+              const typeConfig = SUPPLIER_TYPE_LABELS[supplier.type as keyof typeof SUPPLIER_TYPE_LABELS];
+
+              return (
+                <div key={supplier.id} className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <Building className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900">{supplier.name}</h3>
+                        <p className="text-sm text-slate-500">{supplier.code}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {typeConfig && (
+                        <span className={`px-2 py-1 text-xs font-medium rounded ${typeConfig.color}`}>
+                          {typeConfig.label}
+                        </span>
+                      )}
+                      {statusConfig && (
+                        <span className={`px-2 py-1 text-xs font-medium rounded flex items-center gap-1 ${statusConfig.color}`}>
+                          <StatusIcon className="w-3 h-3" />
+                          {statusConfig.label}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Rating */}
+                  <div className="flex items-center gap-1 mb-4">
+                    {renderStars(supplier.rating)}
+                    <span className="ml-2 text-sm text-slate-500">({supplier.rating}.0)</span>
+                  </div>
+
+                  {/* Contact Info */}
+                  <div className="space-y-2 text-sm mb-4">
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <User className="w-4 h-4 text-slate-400" />
+                      <span>联系人: {supplier.contact.primary}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <Phone className="w-4 h-4 text-slate-400" />
+                      <span>{supplier.contact.phone}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <Mail className="w-4 h-4 text-slate-400" />
+                      <span>{supplier.contact.email}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <MapPin className="w-4 h-4 text-slate-400" />
+                      <span>
+                        {supplier.address.city} {supplier.address.province} {supplier.address.country}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Categories */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {supplier.categories.map((category) => (
+                      <span
+                        key={category}
+                        className="px-2 py-1 text-xs bg-slate-100 text-slate-700 rounded"
+                      >
+                        {category}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Stats */}
+                  <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                    <div>
+                      <p className="text-slate-500">订单数量</p>
+                      <p className="font-medium text-slate-900">{supplier.totalOrders}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">采购金额</p>
+                      <p className="font-medium text-slate-900">¥{(supplier.totalAmount / 10000).toFixed(1)}万</p>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  {supplier.notes && (
+                    <div className="bg-slate-50 rounded-lg p-3 mb-4">
+                      <p className="text-sm text-slate-600">{supplier.notes}</p>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+                    <span className="text-xs text-slate-500">
+                      最后订单: {new Date(supplier.lastOrderDate).toLocaleDateString("zh-CN")}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleEdit(supplier)}
+                        className="p-2 hover:bg-slate-100 rounded-lg"
+                        title="编辑"
+                      >
+                        <Edit className="w-4 h-4 text-slate-600" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(supplier)}
+                        className="p-2 hover:bg-red-100 rounded-lg"
+                        title="删除"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-600" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {filteredSuppliers.length === 0 && suppliers.length > 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+              <Building className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500">没有找到匹配的供应商</p>
+            </div>
+          )}
+        </>
       )}
 
       {/* Delete Confirmation Dialog */}

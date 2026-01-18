@@ -3,7 +3,7 @@
  * 可靠性分析页面
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -18,122 +18,9 @@ import {
   ArrowUp,
   ArrowDown,
   Minus,
+  Loader2,
 } from "lucide-react";
-
-// Mock data
-const MOCK_RELIABILITY_DATA = {
-  summary: {
-    overallReliability: 96.8,
-    previousPeriod: 95.2,
-    totalFlightHours: 12450,
-    totalFlights: 3420,
-    incidents: 23,
-    avgIncidentsPer100Hours: 0.18,
-    mtbf: 541, // Mean Time Between Failures (hours)
-    mttr: 4.2, // Mean Time To Repair (hours)
-  },
-  componentReliability: [
-    {
-      id: "1",
-      component: "电机 M350",
-      partNumber: "MOTOR-M350-01",
-      category: "动力系统",
-      totalInstalled: 48,
-      failures: 3,
-      mtbf: 1850,
-      availability: 99.2,
-      trend: "UP",
-      change: 0.8,
-      topFailureModes: [
-        { mode: "轴承磨损", count: 2, percentage: 67 },
-        { mode: "线圈烧毁", count: 1, percentage: 33 },
-      ],
-    },
-    {
-      id: "2",
-      component: "桨叶 M350",
-      partNumber: "PROP-M350-01",
-      category: "动力系统",
-      totalInstalled: 192,
-      failures: 8,
-      mtbf: 625,
-      availability: 98.5,
-      trend: "DOWN",
-      change: -1.2,
-      topFailureModes: [
-        { mode: "裂纹", count: 5, percentage: 63 },
-        { mode: "变形", count: 3, percentage: 37 },
-      ],
-    },
-    {
-      id: "3",
-      component: "电池组 M350",
-      partNumber: "BATT-M350-01",
-      category: "电源系统",
-      totalInstalled: 120,
-      failures: 12,
-      mtbf: 420,
-      availability: 97.8,
-      trend: "STABLE",
-      change: 0.1,
-      topFailureModes: [
-        { mode: "容量衰减", count: 8, percentage: 67 },
-        { mode: "鼓包", count: 4, percentage: 33 },
-      ],
-    },
-    {
-      id: "4",
-      component: "飞控单元",
-      partNumber: "FC-M350-01",
-      category: "航电系统",
-      totalInstalled: 24,
-      failures: 0,
-      mtbf: 9999,
-      availability: 100,
-      trend: "STABLE",
-      change: 0,
-      topFailureModes: [],
-    },
-    {
-      id: "5",
-      component: "云台 Z30",
-      partNumber: "GIMBAL-Z30",
-      category: "任务载荷",
-      totalInstalled: 12,
-      failures: 2,
-      mtbf: 1250,
-      availability: 98.9,
-      trend: "UP",
-      change: 1.5,
-      topFailureModes: [
-        { mode: "电机故障", count: 1, percentage: 50 },
-        { mode: "传感器异常", count: 1, percentage: 50 },
-      ],
-    },
-  ],
-  systemReliability: [
-    { system: "动力系统", reliability: 97.5, incidents: 10, trend: "DOWN" },
-    { system: "电源系统", reliability: 96.8, incidents: 8, trend: "STABLE" },
-    { system: "航电系统", reliability: 99.2, incidents: 2, trend: "UP" },
-    { system: "结构系统", reliability: 98.5, incidents: 2, trend: "STABLE" },
-    { system: "任务载荷", reliability: 95.8, incidents: 1, trend: "UP" },
-  ],
-  incidentsByMonth: [
-    { month: "2024-08", incidents: 3, flights: 520 },
-    { month: "2024-09", incidents: 4, flights: 580 },
-    { month: "2024-10", incidents: 2, flights: 610 },
-    { month: "2024-11", incidents: 5, flights: 590 },
-    { month: "2024-12", incidents: 4, flights: 570 },
-    { month: "2025-01", incidents: 5, flights: 550 },
-  ],
-  topFailureCauses: [
-    { cause: "磨损", count: 10, percentage: 43.5 },
-    { cause: "制造缺陷", count: 5, percentage: 21.7 },
-    { cause: "操作失误", count: 4, percentage: 17.4 },
-    { cause: "环境因素", count: 3, percentage: 13.0 },
-    { cause: "其他", count: 1, percentage: 4.4 },
-  ],
-};
+import { statsService, ReliabilityData } from "../services/stats.service";
 
 const TREND_ICONS = {
   UP: { icon: ArrowUp, color: "text-green-600", bg: "bg-green-100" },
@@ -148,10 +35,57 @@ const RELIABILITY_LEVEL = (value: number) => {
   return { label: "较差", color: "bg-red-500" };
 };
 
+const PERIOD_DAYS: Record<string, number> = {
+  "3m": 90,
+  "6m": 180,
+  "12m": 365,
+  "all": 730,
+};
+
+// Default empty data structure
+const EMPTY_RELIABILITY_DATA: ReliabilityData = {
+  summary: {
+    overallReliability: 0,
+    previousPeriod: 0,
+    totalFlightHours: 0,
+    totalFlights: 0,
+    incidents: 0,
+    avgIncidentsPer100Hours: 0,
+    mtbf: 0,
+    mttr: 0,
+  },
+  componentReliability: [],
+  systemReliability: [],
+  incidentsByMonth: [],
+  topFailureCauses: [],
+};
+
 export function ReliabilityAnalysisPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<"3m" | "6m" | "12m" | "all">("6m");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [expandedComponent, setExpandedComponent] = useState<string | null>(null);
+  const [reliabilityData, setReliabilityData] = useState<ReliabilityData>(EMPTY_RELIABILITY_DATA);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load data when period changes
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await statsService.getReliabilityData(PERIOD_DAYS[selectedPeriod]);
+        setReliabilityData(data);
+      } catch (err) {
+        console.error("Failed to load reliability data:", err);
+        setError("加载数据失败");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [selectedPeriod]);
 
   const toggleComponent = (componentId: string) => {
     setExpandedComponent(expandedComponent === componentId ? null : componentId);
@@ -162,12 +96,29 @@ export function ReliabilityAnalysisPage() {
   };
 
   const categories = Array.from(
-    new Set(MOCK_RELIABILITY_DATA.componentReliability.map((c) => c.category))
+    new Set(reliabilityData.componentReliability.map((c) => c.category))
   );
 
-  const filteredComponents = MOCK_RELIABILITY_DATA.componentReliability.filter((c) => {
+  const filteredComponents = reliabilityData.componentReliability.filter((c) => {
     return selectedCategory === "ALL" || c.category === selectedCategory;
   });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64 text-red-500">
+        <AlertTriangle className="w-6 h-6 mr-2" />
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -207,7 +158,7 @@ export function ReliabilityAnalysisPage() {
               <BarChart3 className="w-5 h-5 text-blue-600" />
             </div>
             <div className="flex items-center gap-1">
-              {MOCK_RELIABILITY_DATA.summary.overallReliability > MOCK_RELIABILITY_DATA.summary.previousPeriod ? (
+              {reliabilityData.summary.overallReliability > reliabilityData.summary.previousPeriod ? (
                 <ArrowUp className="w-4 h-4 text-green-600" />
               ) : (
                 <ArrowDown className="w-4 h-4 text-red-600" />
@@ -216,10 +167,10 @@ export function ReliabilityAnalysisPage() {
           </div>
           <p className="text-sm text-slate-500">整体可靠性</p>
           <p className="text-3xl font-bold text-slate-900 mt-1">
-            {MOCK_RELIABILITY_DATA.summary.overallReliability}%
+            {reliabilityData.summary.overallReliability}%
           </p>
           <p className="text-xs text-slate-500 mt-2">
-            上期: {MOCK_RELIABILITY_DATA.summary.previousPeriod}%
+            上期: {reliabilityData.summary.previousPeriod}%
           </p>
         </div>
 
@@ -230,7 +181,7 @@ export function ReliabilityAnalysisPage() {
           </div>
           <p className="text-sm text-slate-500">平均故障间隔 (MTBF)</p>
           <p className="text-3xl font-bold text-slate-900 mt-1">
-            {MOCK_RELIABILITY_DATA.summary.mtbf}
+            {reliabilityData.summary.mtbf}
             <span className="text-lg text-slate-500 ml-1">小时</span>
           </p>
         </div>
@@ -242,7 +193,7 @@ export function ReliabilityAnalysisPage() {
           </div>
           <p className="text-sm text-slate-500">平均修复时间 (MTTR)</p>
           <p className="text-3xl font-bold text-slate-900 mt-1">
-            {MOCK_RELIABILITY_DATA.summary.mttr}
+            {reliabilityData.summary.mttr}
             <span className="text-lg text-slate-500 ml-1">小时</span>
           </p>
         </div>
@@ -254,10 +205,10 @@ export function ReliabilityAnalysisPage() {
           </div>
           <p className="text-sm text-slate-500">故障事件</p>
           <p className="text-3xl font-bold text-slate-900 mt-1">
-            {MOCK_RELIABILITY_DATA.summary.incidents}
+            {reliabilityData.summary.incidents}
           </p>
           <p className="text-xs text-slate-500 mt-2">
-            每100小时 {MOCK_RELIABILITY_DATA.summary.avgIncidentsPer100Hours} 次
+            每100小时 {reliabilityData.summary.avgIncidentsPer100Hours} 次
           </p>
         </div>
       </div>
@@ -268,8 +219,8 @@ export function ReliabilityAnalysisPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-4">月度故障趋势</h3>
           <div className="space-y-3">
-            {MOCK_RELIABILITY_DATA.incidentsByMonth.map((item) => {
-              const maxIncidents = Math.max(...MOCK_RELIABILITY_DATA.incidentsByMonth.map((i) => i.incidents));
+            {reliabilityData.incidentsByMonth.map((item) => {
+              const maxIncidents = Math.max(...reliabilityData.incidentsByMonth.map((i) => i.incidents));
               const barWidth = (item.incidents / maxIncidents) * 100;
               const rate = ((item.incidents / item.flights) * 100).toFixed(2);
 
@@ -297,7 +248,7 @@ export function ReliabilityAnalysisPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-4">故障原因分布</h3>
           <div className="space-y-3">
-            {MOCK_RELIABILITY_DATA.topFailureCauses.map((cause, index) => (
+            {reliabilityData.topFailureCauses.map((cause, index) => (
               <div key={index}>
                 <div className="flex items-center justify-between text-sm mb-1">
                   <span className="text-slate-600">{cause.cause}</span>
@@ -321,7 +272,7 @@ export function ReliabilityAnalysisPage() {
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <h3 className="text-lg font-semibold text-slate-900 mb-4">系统可靠性</h3>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          {MOCK_RELIABILITY_DATA.systemReliability.map((system) => {
+          {reliabilityData.systemReliability.map((system) => {
             const TrendIcon = TREND_ICONS[system.trend as keyof typeof TREND_ICONS].icon;
             const trendColor = TREND_ICONS[system.trend as keyof typeof TREND_ICONS].color;
             const reliabilityColor = RELIABILITY_LEVEL(system.reliability).color;

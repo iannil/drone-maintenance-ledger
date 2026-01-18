@@ -15,6 +15,7 @@ import {
   FileText,
   Upload,
   X,
+  Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -45,6 +46,10 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { AircraftStatusBadge } from "../components/common/status-badge";
+import { fullAircraftService, Aircraft } from "../services/fleet.service";
+import { userService, User } from "../services/user.service";
+import { inventoryService, InventoryItem } from "../services/inventory.service";
+import { maintenanceSchedulerService, MaintenanceTrigger } from "../services/maintenance-scheduler.service";
 
 // Work order types
 const WORK_ORDER_TYPES = [
@@ -62,100 +67,13 @@ const PRIORITY_LEVELS = [
   { value: "CRITICAL", label: "紧急", color: "bg-red-100 text-red-700" },
 ];
 
-// Mock aircraft data
-const MOCK_AIRCRAFT = [
-  {
-    id: "ac-001",
-    registration: "B-7011U",
-    model: "DJI M350 RTK",
-    status: "SERVICEABLE",
-    totalFlightHours: 125.5,
-    location: "基地停机坪",
-    upcomingMaintenance: [
-      { id: "ms-001", name: "电机定期检查", dueIn: "5h", type: "FH" },
-    ],
-  },
-  {
-    id: "ac-002",
-    registration: "B-7012U",
-    model: "DJI M350 RTK",
-    status: "SERVICEABLE",
-    totalFlightHours: 89.3,
-    location: "巡检点A",
-    upcomingMaintenance: [],
-  },
-  {
-    id: "ac-003",
-    registration: "B-7013U",
-    model: "DJI M300 RTK",
-    status: "MAINTENANCE",
-    totalFlightHours: 210.8,
-    location: "维修车间",
-    upcomingMaintenance: [
-      { id: "ms-002", name: "180天检查", dueIn: "2天", type: "CALENDAR" },
-    ],
-  },
-  {
-    id: "ac-004",
-    registration: "B-7021U",
-    model: "DJI Mavic 3E",
-    status: "GROUNDED",
-    totalFlightHours: 45.2,
-    location: "维修车间",
-    upcomingMaintenance: [
-      { id: "ms-003", name: "GPS模块更换", dueIn: "已逾期", type: "CALENDAR" },
-    ],
-  },
-];
-
-// Mock maintenance schedules
-const MOCK_SCHEDULES = [
-  {
-    id: "ms-001",
-    name: "电机定期检查",
-    description: "每50飞行小时检查电机状态",
-    triggerType: "FH",
-    triggerValue: 50,
-    tasks: [
-      { title: "外观检查 - 左前电机", description: "检查电机外观是否有损伤", isRii: false },
-      { title: "外观检查 - 右前电机", description: "检查电机外观是否有损伤", isRii: false },
-      { title: "外观检查 - 左后电机", description: "检查电机外观是否有损伤", isRii: false },
-      { title: "外观检查 - 右后电机", description: "检查电机外观是否有损伤", isRii: false },
-      { title: "转速测试 - 左前电机", description: "测试电机最大转速", isRii: true },
-      { title: "转速测试 - 右前电机", description: "测试电机最大转速", isRii: true },
-      { title: "温度检查", description: "检查电机工作温度", isRii: false },
-    ],
-  },
-  {
-    id: "ms-002",
-    name: "180天定期检查",
-    description: "每180天执行全面检查",
-    triggerType: "CALENDAR",
-    triggerValue: 180,
-    tasks: [
-      { title: "机身结构检查", description: "检查机身结构完整性", isRii: true },
-      { title: "电池系统检查", description: "检查电池仓和电源管理系统", isRii: false },
-      { title: "通信系统测试", description: "测试图传和遥控信号", isRii: false },
-    ],
-  },
-];
-
-// Mock inventory parts
-const MOCK_PARTS = [
-  { id: "part-001", name: "电机组件", partNumber: "MOTOR-350-01", quantity: 5, unit: "个", location: "A-01" },
-  { id: "part-002", name: "螺旋桨", partNumber: "PROP-350-21", quantity: 24, unit: "个", location: "B-03" },
-  { id: "part-003", name: "电池包 TB65", partNumber: "BATT-TB65", quantity: 12, unit: "个", location: "C-01" },
-  { id: "part-004", name: "GPS模块", partNumber: "GPS-M300-01", quantity: 2, unit: "个", location: "A-05" },
-  { id: "part-005", name: "主控板", partNumber: "FC-350-01", quantity: 1, unit: "个", location: "A-02" },
-];
-
-// Mock technicians
-const MOCK_TECHNICIANS = [
-  { id: "user-001", name: "张三", role: "MECHANIC", specialization: "电机系统" },
-  { id: "user-002", name: "李四", role: "MECHANIC", specialization: "结构维修" },
-  { id: "user-003", name: "王五", role: "MECHANIC", specialization: "电子设备" },
-  { id: "user-004", name: "赵六", role: "INSPECTOR", specialization: "质量检验" },
-];
+// Status mapping for display
+const STATUS_MAP: Record<string, string> = {
+  AVAILABLE: "SERVICEABLE",
+  IN_MAINTENANCE: "MAINTENANCE",
+  AOG: "GROUNDED",
+  RETIRED: "RETIRED",
+};
 
 interface Task {
   id: string;
@@ -198,6 +116,13 @@ export function WorkOrderFormPage() {
   const navigate = useNavigate();
   const isEditing = Boolean(id);
 
+  // Data from API
+  const [aircraftList, setAircraftList] = useState<Aircraft[]>([]);
+  const [technicians, setTechnicians] = useState<User[]>([]);
+  const [inventoryParts, setInventoryParts] = useState<InventoryItem[]>([]);
+  const [maintenanceTriggers, setMaintenanceTriggers] = useState<MaintenanceTrigger[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   // Form state
   const [formData, setFormData] = useState<WorkOrderFormData>({
     workOrderType: "SCHEDULED",
@@ -218,64 +143,95 @@ export function WorkOrderFormPage() {
   // UI state
   const [showPartDialog, setShowPartDialog] = useState(false);
   const [showTaskDialog, setShowTaskDialog] = useState(false);
-  const [selectedAircraft, setSelectedAircraft] = useState<typeof MOCK_AIRCRAFT[0] | null>(null);
-  const [selectedSchedule, setSelectedSchedule] = useState<typeof MOCK_SCHEDULES[0] | null>(null);
+  const [selectedAircraft, setSelectedAircraft] = useState<Aircraft | null>(null);
+  const [selectedSchedule, setSelectedSchedule] = useState<MaintenanceTrigger | null>(null);
   const [partSearch, setPartSearch] = useState("");
-  const [filteredParts, setFilteredParts] = useState(MOCK_PARTS);
+  const [filteredParts, setFilteredParts] = useState<InventoryItem[]>([]);
   const [newTask, setNewTask] = useState<Partial<Task>>({ title: "", description: "", isRii: false });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Load initial data from APIs
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const [aircraft, users, triggers] = await Promise.all([
+          fullAircraftService.list(100),
+          userService.list({ limit: 100 }),
+          maintenanceSchedulerService.getTriggers({ isActive: true }),
+        ]);
+
+        setAircraftList(aircraft);
+        // Filter for mechanics and inspectors
+        setTechnicians(users.filter(u =>
+          u.role === "MECHANIC" || u.role === "INSPECTOR" || u.role === "ADMIN"
+        ));
+        setMaintenanceTriggers(triggers);
+      } catch (error) {
+        console.error("Failed to load form data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Load parts when dialog is opened
+  useEffect(() => {
+    if (showPartDialog && inventoryParts.length === 0) {
+      inventoryService.list({ limit: 100 })
+        .then(response => {
+          setInventoryParts(response.data);
+          setFilteredParts(response.data);
+        })
+        .catch(error => console.error("Failed to load parts:", error));
+    }
+  }, [showPartDialog, inventoryParts.length]);
 
   // Update aircraft info when selection changes
   useEffect(() => {
     if (formData.aircraftId) {
-      const aircraft = MOCK_AIRCRAFT.find((a) => a.id === formData.aircraftId);
+      const aircraft = aircraftList.find((a) => a.id === formData.aircraftId);
       setSelectedAircraft(aircraft || null);
-
-      // Auto-suggest schedule if aircraft has upcoming maintenance
-      if (aircraft && aircraft.upcomingMaintenance.length > 0 && !formData.scheduleId) {
-        const suggestedSchedule = aircraft.upcomingMaintenance[0];
-        setSelectedSchedule(MOCK_SCHEDULES.find((s) => s.id === suggestedSchedule.id) || null);
-        setFormData((prev) => ({ ...prev, scheduleId: suggestedSchedule.id }));
-      }
     } else {
       setSelectedAircraft(null);
     }
-  }, [formData.aircraftId]);
+  }, [formData.aircraftId, aircraftList]);
 
   // Update schedule info when selection changes
   useEffect(() => {
     if (formData.scheduleId) {
-      const schedule = MOCK_SCHEDULES.find((s) => s.id === formData.scheduleId);
+      const schedule = maintenanceTriggers.find((s) => s.id === formData.scheduleId);
       setSelectedSchedule(schedule || null);
 
-      // Auto-fill tasks from schedule
-      if (schedule && formData.tasks.length === 0) {
+      // Auto-fill title and description from schedule
+      if (schedule && !formData.title) {
         setFormData((prev) => ({
           ...prev,
-          tasks: schedule.tasks.map((t, i) => ({ ...t, id: `task-${Date.now()}-${i}` })),
           title: prev.title || schedule.name,
-          description: prev.description || schedule.description,
+          description: prev.description || schedule.description || "",
         }));
       }
     } else {
       setSelectedSchedule(null);
     }
-  }, [formData.scheduleId]);
+  }, [formData.scheduleId, maintenanceTriggers]);
 
   // Filter parts based on search
   useEffect(() => {
     if (partSearch) {
       setFilteredParts(
-        MOCK_PARTS.filter(
+        inventoryParts.filter(
           (p) =>
             p.name.toLowerCase().includes(partSearch.toLowerCase()) ||
             p.partNumber.toLowerCase().includes(partSearch.toLowerCase())
         )
       );
     } else {
-      setFilteredParts(MOCK_PARTS);
+      setFilteredParts(inventoryParts);
     }
-  }, [partSearch]);
+  }, [partSearch, inventoryParts]);
 
   // Validate form
   const validateForm = (): boolean => {
@@ -355,7 +311,7 @@ export function WorkOrderFormPage() {
   };
 
   // Add part reservation
-  const handleAddPart = (part: typeof MOCK_PARTS[0]) => {
+  const handleAddPart = (part: InventoryItem) => {
     const existingIndex = formData.parts.findIndex((p) => p.partId === part.id);
     if (existingIndex >= 0) {
       // Update quantity if already exists
@@ -377,7 +333,7 @@ export function WorkOrderFormPage() {
             partNumber: part.partNumber,
             quantity: 1,
             unit: part.unit,
-            location: part.location,
+            location: part.location || "",
           },
         ],
       }));
@@ -422,6 +378,13 @@ export function WorkOrderFormPage() {
 
   return (
     <div className="space-y-6">
+      {/* Loading State */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-white/50 flex items-center justify-center z-50">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
@@ -489,19 +452,20 @@ export function WorkOrderFormPage() {
                 <Select
                   value={formData.aircraftId}
                   onValueChange={(value) => updateField("aircraftId", value)}
+                  disabled={isLoading}
                 >
                   <SelectTrigger id="aircraft" className={errors.aircraftId ? "border-red-500" : ""}>
-                    <SelectValue placeholder="选择飞机" />
+                    <SelectValue placeholder={isLoading ? "加载中..." : "选择飞机"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {MOCK_AIRCRAFT.map((aircraft) => (
-                      <SelectItem key={aircraft.id} value={aircraft.id}>
+                    {aircraftList.map((ac) => (
+                      <SelectItem key={ac.id} value={ac.id}>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{aircraft.registration}</span>
+                          <span className="font-medium">{ac.registrationNumber}</span>
                           <span className="text-muted-foreground">·</span>
-                          <span className="text-sm">{aircraft.model}</span>
+                          <span className="text-sm">{ac.model}</span>
                           <span className="text-muted-foreground">·</span>
-                          <AircraftStatusBadge status={aircraft.status as "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED"} />
+                          <AircraftStatusBadge status={(STATUS_MAP[ac.status] || ac.status) as "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED"} />
                         </div>
                       </SelectItem>
                     ))}
@@ -515,8 +479,8 @@ export function WorkOrderFormPage() {
                 {selectedAircraft && (
                   <div className="mt-3 p-3 bg-slate-50 rounded-lg space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{selectedAircraft.registration}</span>
-                      <AircraftStatusBadge status={selectedAircraft.status as "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED"} />
+                      <span className="text-sm font-medium">{selectedAircraft.registrationNumber}</span>
+                      <AircraftStatusBadge status={(STATUS_MAP[selectedAircraft.status] || selectedAircraft.status) as "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED"} />
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                       <div>
@@ -528,44 +492,18 @@ export function WorkOrderFormPage() {
                         <span className="text-foreground">{selectedAircraft.totalFlightHours}h</span>
                       </div>
                       <div>
-                        <span>位置: </span>
-                        <span className="text-foreground">{selectedAircraft.location}</span>
+                        <span>序列号: </span>
+                        <span className="text-foreground">{selectedAircraft.serialNumber}</span>
                       </div>
                     </div>
 
-                    {/* Maintenance Suggestions */}
-                    {selectedAircraft.upcomingMaintenance.length > 0 && (
-                      <div className="pt-2 border-t">
-                        <p className="text-xs font-medium text-muted-foreground mb-2">
-                          建议维保计划:
-                        </p>
-                        {selectedAircraft.upcomingMaintenance.map((maint) => (
-                          <button
-                            key={maint.id}
-                            type="button"
-                            onClick={() => updateField("scheduleId", maint.id)}
-                            className={`w-full text-left p-2 rounded text-xs ${
-                              formData.scheduleId === maint.id
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-white border hover:bg-slate-50"
-                            }`}
-                          >
-                            <div className="font-medium">{maint.name}</div>
-                            <div className="text-muted-foreground">
-                              到期: {maint.dueIn}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
                     {/* Status Warning */}
-                    {(selectedAircraft.status === "MAINTENANCE" ||
-                      selectedAircraft.status === "GROUNDED") && (
+                    {(selectedAircraft.status === "IN_MAINTENANCE" ||
+                      selectedAircraft.status === "AOG") && (
                       <div className="flex items-start gap-2 p-2 bg-amber-50 rounded text-amber-800 text-xs">
                         <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
                         <span>
-                          该飞机当前状态为 {selectedAircraft.status === "GROUNDED" ? "停飞" : "维护中"}
+                          该飞机当前状态为 {selectedAircraft.status === "AOG" ? "停飞" : "维护中"}
                           ，请确认是否可以创建新工单
                         </span>
                       </div>
@@ -581,18 +519,19 @@ export function WorkOrderFormPage() {
                   <Select
                     value={formData.scheduleId}
                     onValueChange={(value) => updateField("scheduleId", value)}
+                    disabled={isLoading}
                   >
                     <SelectTrigger id="schedule">
-                      <SelectValue placeholder="选择维保计划（可选）" />
+                      <SelectValue placeholder={isLoading ? "加载中..." : "选择维保计划（可选）"} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">无关联</SelectItem>
-                      {MOCK_SCHEDULES.map((schedule) => (
-                        <SelectItem key={schedule.id} value={schedule.id}>
+                      {maintenanceTriggers.map((trigger) => (
+                        <SelectItem key={trigger.id} value={trigger.id}>
                           <div>
-                            <div className="font-medium">{schedule.name}</div>
+                            <div className="font-medium">{trigger.name}</div>
                             <div className="text-xs text-muted-foreground">
-                              {schedule.description}
+                              {trigger.description || `${trigger.type}: ${trigger.intervalValue}`}
                             </div>
                           </div>
                         </SelectItem>
@@ -807,17 +746,18 @@ export function WorkOrderFormPage() {
                 <Select
                   value={formData.assignedTo}
                   onValueChange={(value) => updateField("assignedTo", value)}
+                  disabled={isLoading}
                 >
                   <SelectTrigger id="assignedTo" className={errors.assignedTo ? "border-red-500" : ""}>
-                    <SelectValue placeholder="选择负责人" />
+                    <SelectValue placeholder={isLoading ? "加载中..." : "选择负责人"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {MOCK_TECHNICIANS.map((tech) => (
+                    {technicians.map((tech) => (
                       <SelectItem key={tech.id} value={tech.id}>
                         <div>
                           <div className="font-medium">{tech.name}</div>
                           <div className="text-xs text-muted-foreground">
-                            {tech.specialization}
+                            {tech.department || tech.role}
                           </div>
                         </div>
                       </SelectItem>
@@ -936,11 +876,13 @@ export function WorkOrderFormPage() {
                 <div className="pt-2 mt-2 border-t border-blue-200">
                   <span className="text-muted-foreground">触发条件: </span>
                   <span className="font-medium">
-                    {selectedSchedule.triggerType === "FH"
-                      ? `每 ${selectedSchedule.triggerValue} 飞行小时`
-                      : selectedSchedule.triggerType === "CALENDAR"
-                      ? `每 ${selectedSchedule.triggerValue} 天`
-                      : `${selectedSchedule.triggerValue} 次起降`}
+                    {selectedSchedule.type === "FLIGHT_HOURS"
+                      ? `每 ${selectedSchedule.intervalValue} 飞行小时`
+                      : selectedSchedule.type === "CALENDAR_DAYS"
+                      ? `每 ${selectedSchedule.intervalValue} 天`
+                      : selectedSchedule.type === "FLIGHT_CYCLES"
+                      ? `每 ${selectedSchedule.intervalValue} 次起降`
+                      : `每 ${selectedSchedule.intervalValue} 次电池循环`}
                   </span>
                 </div>
               </CardContent>

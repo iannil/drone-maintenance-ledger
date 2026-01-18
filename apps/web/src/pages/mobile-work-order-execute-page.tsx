@@ -6,8 +6,8 @@
  * It features large touch targets, offline support considerations, and simplified workflows.
  */
 
-import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   CheckCircle,
   XCircle,
@@ -29,126 +29,55 @@ import {
   CircleDot,
   Signature,
   MoreVertical,
+  Loader2,
 } from "lucide-react";
+import {
+  workOrderService,
+  WorkOrder,
+  WorkOrderTask,
+} from "../services/work-order.service";
+import { fullAircraftService, Aircraft } from "../services/fleet.service";
+import { userService, User as UserType } from "../services/user.service";
 
-// Mock work order data
-const MOCK_WORK_ORDER = {
-  id: "WO-2025-0142",
-  title: "50小时检查 - B-702A",
-  status: "IN_PROGRESS",
-  priority: "NORMAL",
+// Extended work order type for execution page
+interface ExecutionWorkOrder {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
   aircraft: {
-    id: "AC-2024-0015",
-    registration: "B-702A",
-    model: "DJI Matrice 350 RTK",
-    serialNumber: "SN-M350-0015",
-  },
-  location: "北京基地机库1号位",
-  scheduledStart: "2025-01-15T09:00:00",
-  scheduledEnd: "2025-01-15T11:00:00",
-  actualStart: "2025-01-15T09:15:00",
-  estimatedDuration: 120, // minutes
-  elapsedTime: 45, // minutes
+    id: string;
+    registration: string;
+    model: string;
+    serialNumber: string;
+  } | null;
+  location: string;
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
+  actualStart: string | null;
+  estimatedDuration: number;
+  elapsedTime: number;
   assignedTo: {
-    id: "U-001",
-    name: "张维修",
-    role: "MECHANIC",
-  },
-  tasks: [
-    {
-      id: "task-001",
-      title: "外观检查",
-      description: "检查机体是否有裂纹、变形、腐蚀等损伤",
-      required: true,
-      isRII: false,
-      status: "COMPLETED",
-      completedAt: "2025-01-15T09:25:00",
-      completedBy: "张维修",
-      photos: ["photo-001.jpg"],
-      notes: "未发现异常",
-    },
-    {
-      id: "task-002",
-      title: "螺旋桨检查",
-      description: "检查桨叶是否有损伤、变形，平衡状态是否正常",
-      required: true,
-      isRII: false,
-      status: "COMPLETED",
-      completedAt: "2025-01-15T09:45:00",
-      completedBy: "张维修",
-      photos: ["photo-002.jpg", "photo-003.jpg"],
-      notes: "左侧桨叶发现轻微划痕，不影响使用",
-    },
-    {
-      id: "task-003",
-      title: "电机测试",
-      description: "测试各电机运转状态，检查异响、振动",
-      required: true,
-      isRII: false,
-      status: "IN_PROGRESS",
-      completedAt: null,
-      completedBy: null,
-      photos: [],
-      notes: "",
-    },
-    {
-      id: "task-004",
-      title: "电池检查",
-      description: "检查电池外观、电压、内阻、循环次数",
-      required: true,
-      isRII: false,
-      status: "PENDING",
-      completedAt: null,
-      completedBy: null,
-      photos: [],
-      notes: "",
-    },
-    {
-      id: "task-005",
-      title: "云台校准",
-      description: "校准云台，检查俯仰、横滚、航向动作",
-      required: true,
-      isRII: false,
-      status: "PENDING",
-      completedAt: null,
-      completedBy: null,
-      photos: [],
-      notes: "",
-    },
-    {
-      id: "task-006",
-      title: "GPS测试",
-      description: "测试GPS定位精度和卫星数量",
-      required: true,
-      isRII: false,
-      status: "PENDING",
-      completedAt: null,
-      completedBy: null,
-      photos: [],
-      notes: "",
-    },
-    {
-      id: "task-007",
-      title: "试飞验证",
-      description: "进行功能测试飞行，验证所有系统正常",
-      required: true,
-      isRII: true,
-      status: "PENDING",
-      completedAt: null,
-      completedBy: null,
-      photos: [],
-      notes: "",
-    },
-  ],
-  parts: [
-    { id: "1", name: "桨叶 M350", partNumber: "PROP-M350-01", quantity: 0, used: 0 },
-  ],
-  tools: ["扭力扳手", "万用表", "笔记本电脑", "校准工具"],
-  warnings: [
-    "注意电机高温，等待冷却后再操作",
-    "试飞前确保周围空域安全",
-  ],
-};
+    id: string;
+    name: string;
+    role: string;
+  } | null;
+  tasks: {
+    id: string;
+    title: string;
+    description: string | null;
+    required: boolean;
+    isRII: boolean;
+    status: string;
+    completedAt: string | null;
+    completedBy: string | null;
+    photos: string[];
+    notes: string;
+  }[];
+  parts: { id: string; name: string; partNumber: string; quantity: number; used: number }[];
+  tools: string[];
+  warnings: string[];
+}
 
 const STATUS_CONFIG = {
   PENDING: {
@@ -175,31 +104,175 @@ const STATUS_CONFIG = {
 
 export function MobileWorkOrderExecutePage() {
   const { id } = useParams<{ id: string }>();
-  const [currentTaskIndex, setCurrentTaskIndex] = useState(2); // Start with current task
+  const navigate = useNavigate();
+  const [workOrder, setWorkOrder] = useState<ExecutionWorkOrder | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [taskNotes, setTaskNotes] = useState("");
   const [isPaused, setIsPaused] = useState(false);
 
-  const currentTask = MOCK_WORK_ORDER.tasks[currentTaskIndex];
-  const completedCount = MOCK_WORK_ORDER.tasks.filter((t) => t.status === "COMPLETED").length;
-  const progress = (completedCount / MOCK_WORK_ORDER.tasks.length) * 100;
+  // Load work order data
+  useEffect(() => {
+    async function loadWorkOrder() {
+      if (!id) return;
+      setIsLoading(true);
+      setError(null);
+      try {
+        const wo = await workOrderService.getById(id);
+        const tasks = await workOrderService.getTasks(id);
+
+        // Load aircraft info
+        let aircraft: { id: string; registration: string; model: string; serialNumber: string } | null = null;
+        if (wo.aircraftId) {
+          try {
+            const aircraftData = await fullAircraftService.getById(wo.aircraftId);
+            aircraft = {
+              id: aircraftData.id,
+              registration: aircraftData.registrationNumber,
+              model: aircraftData.model,
+              serialNumber: aircraftData.serialNumber,
+            };
+          } catch {
+            console.warn("Failed to load aircraft info");
+          }
+        }
+
+        // Load assignee info
+        let assignedTo: { id: string; name: string; role: string } | null = null;
+        if (wo.assignedTo) {
+          try {
+            const user = await userService.getById(wo.assignedTo);
+            assignedTo = {
+              id: user.id,
+              name: user.name,
+              role: user.role,
+            };
+          } catch {
+            console.warn("Failed to load assignee info");
+          }
+        }
+
+        // Map to ExecutionWorkOrder format
+        const executionWorkOrder: ExecutionWorkOrder = {
+          id: wo.id,
+          title: wo.title,
+          status: wo.status,
+          priority: wo.priority,
+          aircraft,
+          location: "-",
+          scheduledStart: wo.scheduledStart ? new Date(wo.scheduledStart).toISOString() : null,
+          scheduledEnd: wo.scheduledEnd ? new Date(wo.scheduledEnd).toISOString() : null,
+          actualStart: wo.actualStart ? new Date(wo.actualStart).toISOString() : null,
+          estimatedDuration: 120,
+          elapsedTime: wo.actualStart ? Math.floor((Date.now() - wo.actualStart) / 60000) : 0,
+          assignedTo,
+          tasks: tasks.map((t) => ({
+            id: t.id,
+            title: t.title,
+            description: t.description,
+            required: true,
+            isRII: t.isRii,
+            status: t.status,
+            completedAt: t.completedAt ? new Date(t.completedAt).toISOString() : null,
+            completedBy: null,
+            photos: [],
+            notes: t.notes || "",
+          })),
+          parts: [],
+          tools: [],
+          warnings: [],
+        };
+
+        setWorkOrder(executionWorkOrder);
+
+        // Set current task index to first non-completed task
+        const firstIncomplete = executionWorkOrder.tasks.findIndex((t) => t.status !== "COMPLETED");
+        setCurrentTaskIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
+      } catch (err) {
+        console.error("Failed to load work order:", err);
+        setError("无法加载工单信息");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadWorkOrder();
+  }, [id]);
+
+  const currentTask = workOrder?.tasks[currentTaskIndex];
+  const completedCount = workOrder?.tasks.filter((t) => t.status === "COMPLETED").length || 0;
+  const progress = workOrder ? (completedCount / workOrder.tasks.length) * 100 : 0;
 
   const handleCompleteTask = () => {
+    if (!currentTask || !workOrder) return;
     console.log("Completing task:", currentTask.id);
     // Move to next task
-    if (currentTaskIndex < MOCK_WORK_ORDER.tasks.length - 1) {
+    if (currentTaskIndex < workOrder.tasks.length - 1) {
       setCurrentTaskIndex(currentTaskIndex + 1);
     }
   };
 
   const handleSkipTask = () => {
+    if (!currentTask || !workOrder) return;
     console.log("Skipping task:", currentTask.id);
-    if (currentTaskIndex < MOCK_WORK_ORDER.tasks.length - 1) {
+    if (currentTaskIndex < workOrder.tasks.length - 1) {
       setCurrentTaskIndex(currentTaskIndex + 1);
     }
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
+          <p className="text-slate-600">加载工单信息...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !workOrder) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">{error || "未找到工单"}</h2>
+          <p className="text-slate-600 mb-4">请检查工单是否存在或联系管理员</p>
+          <Link
+            to="/work-orders"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg"
+          >
+            <Home className="w-4 h-4" />
+            返回工单列表
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty tasks state
+  if (!workOrder.tasks.length || !currentTask) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="text-center">
+          <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">暂无工单任务</h2>
+          <p className="text-slate-600 mb-4">此工单尚未添加任务项</p>
+          <Link
+            to={`/work-orders/${workOrder.id}`}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg"
+          >
+            查看工单详情
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const handlePrevTask = () => {
     if (currentTaskIndex > 0) {
@@ -217,8 +290,8 @@ export function MobileWorkOrderExecutePage() {
               <ChevronLeft className="w-5 h-5 text-slate-600" />
             </Link>
             <div className="text-center">
-              <h1 className="text-base font-semibold text-slate-900">{MOCK_WORK_ORDER.title}</h1>
-              <p className="text-xs text-slate-500">{MOCK_WORK_ORDER.id}</p>
+              <h1 className="text-base font-semibold text-slate-900">{workOrder.title}</h1>
+              <p className="text-xs text-slate-500">{workOrder.id}</p>
             </div>
             <button className="p-2 -mr-2 hover:bg-slate-100 rounded-lg">
               <MoreVertical className="w-5 h-5 text-slate-600" />
@@ -229,7 +302,7 @@ export function MobileWorkOrderExecutePage() {
           <div className="mt-3">
             <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
               <span>进度</span>
-              <span>{completedCount}/{MOCK_WORK_ORDER.tasks.length} 已完成</span>
+              <span>{completedCount}/{workOrder.tasks.length} 已完成</span>
             </div>
             <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
               <div
@@ -250,18 +323,18 @@ export function MobileWorkOrderExecutePage() {
                 <span className="text-xl">✈️</span>
               </div>
               <div>
-                <p className="font-semibold text-slate-900">{MOCK_WORK_ORDER.aircraft.registration}</p>
-                <p className="text-sm text-slate-500">{MOCK_WORK_ORDER.aircraft.model}</p>
+                <p className="font-semibold text-slate-900">{workOrder.aircraft.registration}</p>
+                <p className="text-sm text-slate-500">{workOrder.aircraft.model}</p>
               </div>
             </div>
             <div className="text-right">
               <div className="flex items-center gap-1 text-slate-500">
                 <MapPin className="w-4 h-4" />
-                <span className="text-sm">{MOCK_WORK_ORDER.location}</span>
+                <span className="text-sm">{workOrder.location}</span>
               </div>
               <div className="flex items-center gap-1 text-slate-500 mt-1">
                 <User className="w-4 h-4" />
-                <span className="text-sm">{MOCK_WORK_ORDER.assignedTo.name}</span>
+                <span className="text-sm">{workOrder.assignedTo.name}</span>
               </div>
             </div>
           </div>
@@ -274,7 +347,7 @@ export function MobileWorkOrderExecutePage() {
                 <div>
                   <p className="text-xs text-slate-500">已用时间</p>
                   <p className="text-lg font-semibold text-slate-900">
-                    {Math.floor(MOCK_WORK_ORDER.elapsedTime / 60)}:{(MOCK_WORK_ORDER.elapsedTime % 60).toString().padStart(2, "0")}
+                    {Math.floor(workOrder.elapsedTime / 60)}:{(workOrder.elapsedTime % 60).toString().padStart(2, "0")}
                   </p>
                 </div>
               </div>
@@ -292,14 +365,14 @@ export function MobileWorkOrderExecutePage() {
         </div>
 
         {/* Warnings */}
-        {MOCK_WORK_ORDER.warnings.length > 0 && (
+        {workOrder.warnings.length > 0 && (
           <div className="bg-orange-50 border-b border-orange-200 p-4">
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
               <div>
                 <p className="font-medium text-orange-900">注意事项</p>
                 <ul className="mt-2 space-y-1">
-                  {MOCK_WORK_ORDER.warnings.map((warning, index) => (
+                  {workOrder.warnings.map((warning, index) => (
                     <li key={index} className="text-sm text-orange-700">
                       • {warning}
                     </li>
@@ -323,13 +396,13 @@ export function MobileWorkOrderExecutePage() {
               <ChevronLeft className="w-6 h-6" />
             </button>
             <div className="text-center">
-              <p className="text-sm text-slate-500">任务 {currentTaskIndex + 1} / {MOCK_WORK_ORDER.tasks.length}</p>
+              <p className="text-sm text-slate-500">任务 {currentTaskIndex + 1} / {workOrder.tasks.length}</p>
             </div>
             <button
               onClick={() => setCurrentTaskIndex(currentTaskIndex + 1)}
-              disabled={currentTaskIndex === MOCK_WORK_ORDER.tasks.length - 1}
+              disabled={currentTaskIndex === workOrder.tasks.length - 1}
               className={`p-2 rounded-lg ${
-                currentTaskIndex === MOCK_WORK_ORDER.tasks.length - 1
+                currentTaskIndex === workOrder.tasks.length - 1
                   ? "text-slate-300"
                   : "text-slate-600 hover:bg-slate-100"
               }`}
@@ -428,7 +501,7 @@ export function MobileWorkOrderExecutePage() {
         <div className="bg-white m-4 rounded-xl border border-slate-200 p-4">
           <h3 className="font-semibold text-slate-900 mb-3">任务列表</h3>
           <div className="space-y-2">
-            {MOCK_WORK_ORDER.tasks.map((task, index) => {
+            {workOrder.tasks.map((task, index) => {
               const StatusIcon = STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG].icon;
               const isActive = index === currentTaskIndex;
 
@@ -484,7 +557,7 @@ export function MobileWorkOrderExecutePage() {
         <div className="bg-white m-4 rounded-xl border border-slate-200 p-4">
           <h3 className="font-semibold text-slate-900 mb-3">所需工具</h3>
           <div className="flex flex-wrap gap-2">
-            {MOCK_WORK_ORDER.tools.map((tool) => (
+            {workOrder.tools.map((tool) => (
               <span
                 key={tool}
                 className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded-lg"

@@ -3,7 +3,7 @@
  * 零部件拆装详情页面
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -17,87 +17,74 @@ import {
   Camera,
   Download,
   Printer,
-  Edit,
   History,
+  Loader2,
+  Package,
 } from "lucide-react";
 
-// Mock data
-const MOCK_REMOVAL = {
-  id: "RM-2025-0142",
-  componentId: "COMP-2024-0892",
-  componentName: "电机 DJI M350",
-  serialNumber: "SN-M350-0892",
-  removalType: "REPAIR",
-  reason: "异常噪音，需返厂检修",
-  removalDate: "2025-01-10T14:30:00",
-  aircraftFrom: {
-    id: "AC-2024-0015",
-    registration: "B-702A",
-    model: "DJI Matrice 350 RTK",
-    position: "前左电机",
-  },
-  aircraftTo: null, // If installed elsewhere
-  removedBy: {
-    id: "U-001",
-    name: "张维修",
-    role: "MECHANIC",
-  },
-  inspectedBy: {
-    id: "U-002",
-    name: "李检验",
-    role: "INSPECTOR",
-  },
-  workOrderId: "WO-2025-0142",
-  flightHoursAtRemoval: 342.5,
-  cyclesAtRemoval: 128,
-  status: "COMPLETED",
-  remarks: "发现轴承磨损，建议更换整个电机模块",
-  photos: [
-    { id: "1", url: "/placeholder1.jpg", description: "拆卸前照片" },
-    { id: "2", url: "/placeholder2.jpg", description: "拆卸后照片" },
-    { id: "3", url: "/placeholder3.jpg", description: "故障部位特写" },
-  ],
-  documents: [
-    { id: "1", name: "拆装记录单.pdf", type: "PDF", size: "245KB" },
-    { id: "2", name: "检验报告.pdf", type: "PDF", size: "189KB" },
-  ],
-  createdAt: "2025-01-10T14:30:00",
-  updatedAt: "2025-01-10T16:45:00",
-};
+// Interfaces
+interface RemovalPhoto {
+  id: string;
+  url: string;
+  description: string;
+}
 
-const MOCK_COMPONENT_HISTORY = [
-  {
-    id: "1",
-    date: "2024-03-15T10:00:00",
-    type: "INSTALL",
-    aircraft: "B-702A",
-    position: "前左电机",
-    performedBy: "王安装",
-    flightHours: 0,
-  },
-  {
-    id: "2",
-    date: "2024-06-20T14:00:00",
-    type: "INSPECTION",
-    aircraft: "B-702A",
-    position: "前左电机",
-    performedBy: "李检验",
-    flightHours: 89,
-    result: "正常",
-  },
-  {
-    id: "3",
-    date: "2025-01-10T14:30:00",
-    type: "REMOVAL",
-    aircraft: "B-702A",
-    position: "前左电机",
-    performedBy: "张维修",
-    flightHours: 342.5,
-    reason: "异常噪音",
-  },
-];
+interface RemovalDocument {
+  id: string;
+  name: string;
+  type: string;
+  size: string;
+}
 
-const REMOVAL_TYPE_LABELS = {
+interface RemovalPerson {
+  id: string;
+  name: string;
+  role: string;
+}
+
+interface RemovalAircraft {
+  id: string;
+  registration: string;
+  model: string;
+  position: string;
+}
+
+interface ComponentRemoval {
+  id: string;
+  componentId: string;
+  componentName: string;
+  serialNumber: string;
+  removalType: string;
+  reason: string;
+  removalDate: string;
+  aircraftFrom: RemovalAircraft;
+  aircraftTo: RemovalAircraft | null;
+  removedBy: RemovalPerson;
+  inspectedBy: RemovalPerson | null;
+  workOrderId: string;
+  flightHoursAtRemoval: number;
+  cyclesAtRemoval: number;
+  status: string;
+  remarks: string;
+  photos: RemovalPhoto[];
+  documents: RemovalDocument[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ComponentHistoryRecord {
+  id: string;
+  date: string;
+  type: string;
+  aircraft: string;
+  position: string;
+  performedBy: string;
+  flightHours: number;
+  result?: string;
+  reason?: string;
+}
+
+const REMOVAL_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   REPLACEMENT: { label: "更换", color: "bg-blue-100 text-blue-700" },
   REPAIR: { label: "维修", color: "bg-orange-100 text-orange-700" },
   INSPECTION: { label: "检查", color: "bg-purple-100 text-purple-700" },
@@ -105,7 +92,7 @@ const REMOVAL_TYPE_LABELS = {
   UPGRADE: { label: "升级", color: "bg-green-100 text-green-700" },
 };
 
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   PENDING: { label: "待处理", color: "bg-yellow-100 text-yellow-700", icon: Clock },
   IN_PROGRESS: { label: "进行中", color: "bg-blue-100 text-blue-700", icon: Wrench },
   COMPLETED: { label: "已完成", color: "bg-green-100 text-green-700", icon: CheckCircle },
@@ -116,10 +103,37 @@ export function ComponentRemovalDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [removal, setRemoval] = useState<ComponentRemoval | null>(null);
+  const [componentHistory, setComponentHistory] = useState<ComponentHistoryRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const removal = MOCK_REMOVAL;
-  const statusConfig = STATUS_CONFIG[removal.status as keyof typeof STATUS_CONFIG];
-  const StatusIcon = statusConfig.icon;
+  // Load removal data
+  useEffect(() => {
+    async function loadRemovalData() {
+      if (!id) return;
+      setIsLoading(true);
+      setError(null);
+      try {
+        // TODO: Replace with actual API call
+        // const data = await componentRemovalService.getById(id);
+        // setRemoval(data);
+        // const history = await componentRemovalService.getComponentHistory(data.componentId);
+        // setComponentHistory(history);
+
+        // Simulate loading delay then set empty state
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setRemoval(null);
+        setComponentHistory([]);
+      } catch (err) {
+        console.error("Failed to load removal record:", err);
+        setError("无法加载拆装记录");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadRemovalData();
+  }, [id]);
 
   const handlePrint = () => {
     window.print();
@@ -128,6 +142,61 @@ export function ComponentRemovalDetailPage() {
   const handleDownload = () => {
     console.log("Downloading removal record");
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-slate-500">加载拆装记录...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error or empty state
+  if (error || !removal) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <Link
+            to="/components/removals"
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-slate-600" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">拆装记录详情</h1>
+            <p className="text-slate-500 mt-1">{id || "未知ID"}</p>
+          </div>
+        </div>
+
+        {/* Empty/Error State */}
+        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+          <Package className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">
+            {error || "未找到拆装记录"}
+          </h3>
+          <p className="text-slate-500 mb-6">
+            请检查链接是否正确或返回列表页面
+          </p>
+          <Link
+            to="/components/removals"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            返回拆装列表
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const statusConfig = STATUS_CONFIG[removal.status] || STATUS_CONFIG.PENDING;
+  const StatusIcon = statusConfig.icon;
+  const removalTypeConfig = REMOVAL_TYPE_LABELS[removal.removalType] || REMOVAL_TYPE_LABELS.REPLACEMENT;
 
   return (
     <div className="space-y-6">
@@ -196,10 +265,8 @@ export function ComponentRemovalDetailPage() {
                 </div>
                 <div>
                   <p className="text-sm text-slate-500 mb-1">拆装类型</p>
-                  <span className={`px-2 py-1 text-sm font-medium rounded ${
-                    REMOVAL_TYPE_LABELS[removal.removalType as keyof typeof REMOVAL_TYPE_LABELS].color
-                  }`}>
-                    {REMOVAL_TYPE_LABELS[removal.removalType as keyof typeof REMOVAL_TYPE_LABELS].label}
+                  <span className={`px-2 py-1 text-sm font-medium rounded ${removalTypeConfig.color}`}>
+                    {removalTypeConfig.label}
                   </span>
                 </div>
                 <div>
@@ -349,50 +416,56 @@ export function ComponentRemovalDetailPage() {
             </div>
             {showHistory && (
               <div className="p-6">
-                <div className="space-y-4">
-                  {MOCK_COMPONENT_HISTORY.map((record, index) => (
-                    <div key={record.id} className="relative">
-                      {index < MOCK_COMPONENT_HISTORY.length - 1 && (
-                        <div className="absolute left-4 top-8 bottom-0 w-0.5 bg-slate-200" />
-                      )}
-                      <div className="flex items-start gap-4">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          record.type === "REMOVAL" ? "bg-orange-100" :
-                          record.type === "INSTALL" ? "bg-green-100" : "bg-blue-100"
-                        }`}>
-                          <div className={`w-3 h-3 rounded-full ${
-                            record.type === "REMOVAL" ? "bg-orange-500" :
-                            record.type === "INSTALL" ? "bg-green-500" : "bg-blue-500"
-                          }`} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <p className="font-medium text-slate-900">
-                              {record.type === "INSTALL" ? "安装" :
-                               record.type === "REMOVAL" ? "拆卸" : "检查"}
-                            </p>
-                            <p className="text-sm text-slate-500">
-                              {new Date(record.date).toLocaleString("zh-CN")}
-                            </p>
+                {componentHistory.length > 0 ? (
+                  <div className="space-y-4">
+                    {componentHistory.map((record, index) => (
+                      <div key={record.id} className="relative">
+                        {index < componentHistory.length - 1 && (
+                          <div className="absolute left-4 top-8 bottom-0 w-0.5 bg-slate-200" />
+                        )}
+                        <div className="flex items-start gap-4">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            record.type === "REMOVAL" ? "bg-orange-100" :
+                            record.type === "INSTALL" ? "bg-green-100" : "bg-blue-100"
+                          }`}>
+                            <div className={`w-3 h-3 rounded-full ${
+                              record.type === "REMOVAL" ? "bg-orange-500" :
+                              record.type === "INSTALL" ? "bg-green-500" : "bg-blue-500"
+                            }`} />
                           </div>
-                          <div className="mt-1 text-sm text-slate-600">
-                            <span>{record.aircraft}</span>
-                            <span className="mx-2">·</span>
-                            <span>{record.position}</span>
-                            <span className="mx-2">·</span>
-                            <span>{record.performedBy}</span>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium text-slate-900">
+                                {record.type === "INSTALL" ? "安装" :
+                                 record.type === "REMOVAL" ? "拆卸" : "检查"}
+                              </p>
+                              <p className="text-sm text-slate-500">
+                                {new Date(record.date).toLocaleString("zh-CN")}
+                              </p>
+                            </div>
+                            <div className="mt-1 text-sm text-slate-600">
+                              <span>{record.aircraft}</span>
+                              <span className="mx-2">·</span>
+                              <span>{record.position}</span>
+                              <span className="mx-2">·</span>
+                              <span>{record.performedBy}</span>
+                            </div>
+                            {record.result && (
+                              <p className="text-sm text-slate-500 mt-1">结果: {record.result}</p>
+                            )}
+                            {record.reason && (
+                              <p className="text-sm text-orange-600 mt-1">原因: {record.reason}</p>
+                            )}
                           </div>
-                          {record.result && (
-                            <p className="text-sm text-slate-500 mt-1">结果: {record.result}</p>
-                          )}
-                          {record.reason && (
-                            <p className="text-sm text-orange-600 mt-1">原因: {record.reason}</p>
-                          )}
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-slate-500">
+                    暂无履历记录
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -483,7 +556,7 @@ export function ComponentRemovalDetailPage() {
       </div>
 
       {/* Photo Modal */}
-      {selectedPhoto !== null && (
+      {selectedPhoto !== null && removal.photos[selectedPhoto] && (
         <div
           className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
           onClick={() => setSelectedPhoto(null)}

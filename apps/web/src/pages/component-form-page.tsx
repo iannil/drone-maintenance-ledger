@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import {
@@ -11,7 +11,11 @@ import {
   MapPin,
   FileText,
   Clock,
+  Loader2,
 } from "lucide-react";
+
+import { componentService, Component } from "../services/component.service";
+import { fullAircraftService, Aircraft } from "../services/fleet.service";
 
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -27,26 +31,18 @@ import {
 import { ComponentStatusBadge } from "../components/common/status-badge";
 import { AircraftStatusBadge } from "../components/common/status-badge";
 
-// Mock component types
+// Component types
 const COMPONENT_TYPES = [
   { value: "MOTOR", label: "电机" },
   { value: "PROPELLER", label: "螺旋桨" },
   { value: "BATTERY", label: "电池" },
+  { value: "ESC", label: "电调" },
   { value: "FLIGHT_CONTROLLER", label: "飞控" },
   { value: "GPS", label: "GPS模块" },
   { value: "CAMERA", label: "相机" },
   { value: "GIMBAL", label: "云台" },
-  { value: "ANTENNA", label: "天线" },
-  { value: "FRAME", label: "机架" },
   { value: "LANDING_GEAR", label: "起落架" },
   { value: "OTHER", label: "其他" },
-];
-
-// Mock aircraft for installation
-const MOCK_AIRCRAFT = [
-  { id: "ac-001", registration: "B-7011U", status: "SERVICEABLE" },
-  { id: "ac-002", registration: "B-7012U", status: "SERVICEABLE" },
-  { id: "ac-003", registration: "B-7013U", status: "MAINTENANCE" },
 ];
 
 // Install position options
@@ -65,27 +61,53 @@ const INSTALL_POSITIONS = [
   "外部",
 ];
 
-// Mock component data for editing
-const MOCK_COMPONENT: Record<string, ComponentFormData> = {
-  "edit-001": {
-    serialNumber: "SN-M001",
-    name: "DJI 350 RTK 电机",
-    type: "MOTOR",
-    manufacturer: "DJI",
-    model: "350 RTK Motor",
-    status: "INSTALLED",
-    currentAircraftId: "ac-001",
-    installPosition: "左前",
-    installDate: "2024-03-20",
-    productionDate: "2023-05-10",
-    purchaseDate: "2023-06-15",
-    warrantyExpiry: "2025-06-15",
-    flightHoursLimit: 500,
-    currentFlightHours: 125.5,
-    cycleLimit: 1000,
-    currentCycles: 320,
-    remarks: "状态良好，定期维护中",
-  },
+// Map backend status to form status
+const mapBackendStatusToFormStatus = (status: string): "IN_STOCK" | "INSTALLED" | "REMOVED" | "SCRAPPED" => {
+  switch (status) {
+    case "NEW":
+      return "IN_STOCK";
+    case "IN_USE":
+      return "INSTALLED";
+    case "REPAIR":
+      return "REMOVED";
+    case "SCRAPPED":
+    case "LOST":
+      return "SCRAPPED";
+    default:
+      return "IN_STOCK";
+  }
+};
+
+// Map form status to backend status
+const mapFormStatusToBackendStatus = (status: string): string => {
+  switch (status) {
+    case "IN_STOCK":
+      return "NEW";
+    case "INSTALLED":
+      return "IN_USE";
+    case "REMOVED":
+      return "REPAIR";
+    case "SCRAPPED":
+      return "SCRAPPED";
+    default:
+      return "NEW";
+  }
+};
+
+// Map backend aircraft status to display status
+const mapAircraftStatus = (status: string): "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED" => {
+  switch (status) {
+    case "AVAILABLE":
+      return "SERVICEABLE";
+    case "IN_MAINTENANCE":
+      return "MAINTENANCE";
+    case "AOG":
+      return "GROUNDED";
+    case "RETIRED":
+      return "RETIRED";
+    default:
+      return "SERVICEABLE";
+  }
 };
 
 type ComponentFormData = {
@@ -114,16 +136,20 @@ export function ComponentFormPage() {
   const isEditing = id !== undefined && id !== "new";
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [aircraftList, setAircraftList] = useState<Aircraft[]>([]);
+  const [componentData, setComponentData] = useState<Component | null>(null);
 
-  // Initialize form with mock data if editing
+  // Initialize form with default values
   const {
     register,
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors, isDirty },
   } = useForm<ComponentFormData>({
-    defaultValues: isEditing && id ? MOCK_COMPONENT[id] : {
+    defaultValues: {
       serialNumber: "",
       name: "",
       type: "OTHER",
@@ -143,6 +169,57 @@ export function ComponentFormPage() {
       remarks: "",
     },
   });
+
+  // Load aircraft list and component data
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        // Load aircraft list
+        const aircraft = await fullAircraftService.list();
+        setAircraftList(aircraft);
+
+        // Load component data if editing
+        if (isEditing && id) {
+          const component = await componentService.getById(id);
+          setComponentData(component);
+
+          // Format dates from timestamps
+          const formatDate = (timestamp: number | null): string => {
+            if (!timestamp) return "";
+            return new Date(timestamp).toISOString().split("T")[0];
+          };
+
+          // Reset form with component data
+          reset({
+            serialNumber: component.serialNumber,
+            name: component.description || component.partNumber,
+            type: component.type,
+            manufacturer: component.manufacturer,
+            model: component.model || "",
+            status: mapBackendStatusToFormStatus(component.status),
+            currentAircraftId: "",
+            installPosition: "",
+            installDate: "",
+            productionDate: formatDate(component.manufacturedAt),
+            purchaseDate: formatDate(component.purchasedAt),
+            warrantyExpiry: "",
+            flightHoursLimit: component.maxFlightHours || 0,
+            currentFlightHours: component.totalFlightHours,
+            cycleLimit: component.maxCycles || 0,
+            currentCycles: component.totalFlightCycles,
+            remarks: "",
+          });
+        }
+      } catch (error) {
+        console.error("Failed to load data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [id, isEditing, reset]);
 
   const selectedStatus = watch("status");
   const selectedType = watch("type");
@@ -170,6 +247,18 @@ export function ComponentFormPage() {
       navigate("/components");
     }
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+          <p className="text-sm text-slate-500">加载中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
@@ -358,11 +447,11 @@ export function ComponentFormPage() {
                           <SelectValue placeholder="选择装机飞机" />
                         </SelectTrigger>
                         <SelectContent>
-                          {MOCK_AIRCRAFT.map((aircraft) => (
+                          {aircraftList.map((aircraft) => (
                             <SelectItem key={aircraft.id} value={aircraft.id}>
                               <div className="flex items-center gap-2">
-                                <span>{aircraft.registration}</span>
-                                <AircraftStatusBadge status={aircraft.status as "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED"} />
+                                <span>{aircraft.registrationNumber}</span>
+                                <AircraftStatusBadge status={mapAircraftStatus(aircraft.status)} />
                               </div>
                             </SelectItem>
                           ))}

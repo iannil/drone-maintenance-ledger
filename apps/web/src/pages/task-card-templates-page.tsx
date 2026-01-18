@@ -3,7 +3,7 @@
  * 工卡模板管理页面
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   Search,
@@ -22,145 +22,45 @@ import {
   Calendar,
   ChevronDown,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
-// Mock data
-const MOCK_TEMPLATES = [
-  {
-    id: "TPL-001",
-    name: "50小时检查",
-    code: "CHK-50H",
-    category: "定期检查",
-    type: "FH",
-    intervalValue: 50,
-    intervalUnit: "飞行小时",
-    estimatedDuration: 120,
-    description: "每50飞行小时进行的例行检查，包括机体、动力系统、电池状态检查",
-    steps: [
-      { id: 1, title: "外观检查", description: "检查机体是否有裂纹、变形", required: true },
-      { id: 2, title: "螺旋桨检查", description: "检查桨叶是否有损伤、平衡状态", required: true },
-      { id: 3, title: "电机测试", description: "测试各电机运转状态，检查异响", required: true },
-      { id: 4, title: "电池检查", description: "检查电池外观、电压、内阻", required: true },
-      { id: 5, title: "云台校准", description: "校准云台，检查俯仰、横滚、航向", required: true },
-      { id: 6, title: "GPS测试", description: "测试GPS定位精度和卫星数量", required: true },
-    ],
-    requiredSkills: ["MECHANIC"],
-    requiredParts: [],
-    requiresRII: false,
-    isActive: true,
-    version: "v2.1",
-    lastModified: "2025-01-10T10:30:00",
-    modifiedBy: "张工程师",
-    usageCount: 156,
-  },
-  {
-    id: "TPL-002",
-    name: "桨叶更换",
-    code: "RPL-PROP",
-    category: "零部件更换",
-    type: "LLP",
-    intervalValue: 500,
-    intervalUnit: "飞行小时",
-    estimatedDuration: 60,
-    description: "寿命件桨叶更换程序，包括拆卸、安装、平衡调试",
-    steps: [
-      { id: 1, title: "拆卸旧桨叶", description: "使用专用工具拆卸旧桨叶", required: true },
-      { id: 2, title: "清洁安装座", description: "清洁电机轴和安装座", required: true },
-      { id: 3, title: "安装新桨叶", description: "安装新桨叶并按规定力矩拧紧", required: true },
-      { id: 4, title: "动平衡测试", description: "进行动平衡测试，确保平衡", required: true, isRII: true },
-      { id: 5, title: "试飞验证", description: "进行试飞，验证振动水平", required: true },
-    ],
-    requiredSkills: ["MECHANIC", "INSPECTOR"],
-    requiredParts: [{ partNumber: "PROP-M350-01", quantity: 1, name: "桨叶 M350" }],
-    requiresRII: true,
-    isActive: true,
-    version: "v1.5",
-    lastModified: "2025-01-08T14:20:00",
-    modifiedBy: "李工程师",
-    usageCount: 89,
-  },
-  {
-    id: "TPL-003",
-    name: "年检",
-    code: "CHK-ANN",
-    category: "定期检查",
-    type: "CALENDAR",
-    intervalValue: 365,
-    intervalUnit: "天",
-    estimatedDuration: 480,
-    description: "年度全面检查，覆盖所有系统和安全关键项目",
-    steps: [
-      { id: 1, title: "机体结构检查", description: "全面检查机体结构完整性", required: true },
-      { id: 2, title: "动力系统检查", description: "检查所有电机、电调、螺旋桨", required: true },
-      { id: 3, title: "电池组检查", description: "检查所有电池组，进行容量测试", required: true },
-      { id: 4, title: "航电系统检查", description: "检查飞控、GPS、遥控系统", required: true },
-      { id: 5, title: "云台相机检查", description: "检查云台和相机功能", required: true },
-      { id: 6, title: "通信系统检查", description: "检查图传、数传系统", required: true },
-      { id: 7, title: "安全设备检查", description: "检查降落伞、返航保护等", required: true },
-      { id: 8, title: "飞行测试", description: "进行完整功能测试飞行", required: true, isRII: true },
-    ],
-    requiredSkills: ["MECHANIC", "INSPECTOR"],
-    requiredParts: [],
-    requiresRII: true,
-    isActive: true,
-    version: "v3.0",
-    lastModified: "2025-01-05T09:00:00",
-    modifiedBy: "王主管",
-    usageCount: 48,
-  },
-  {
-    id: "TPL-004",
-    name: "电池循环更换",
-    code: "RPL-BATT",
-    category: "零部件更换",
-    type: "BATTERY",
-    intervalValue: 300,
-    intervalUnit: "循环次数",
-    estimatedDuration: 30,
-    description: "达到循环寿命上限的电池组更换程序",
-    steps: [
-      { id: 1, title: "电池状态确认", description: "确认电池已达到循环上限", required: true },
-      { id: 2, title: "拆卸旧电池", description: "从飞机上拆卸旧电池", required: true },
-      { id: 3, title: "安装新电池", description: "安装新电池并固定", required: true },
-      { id: 4, title: "电池信息录入", description: "录入新电池序列号等信息", required: true },
-    ],
-    requiredSkills: ["MECHANIC"],
-    requiredParts: [{ partNumber: "BATT-M350-01", quantity: 1, name: "电池组 M350" }],
-    requiresRII: false,
-    isActive: true,
-    version: "v1.2",
-    lastModified: "2024-12-20T11:30:00",
-    modifiedBy: "张工程师",
-    usageCount: 234,
-  },
-  {
-    id: "TPL-005",
-    name: "电机故障排查",
-    code: "TRB-MOTOR",
-    category: "故障排除",
-    type: "ON_DEMAND",
-    intervalValue: null,
-    intervalUnit: null,
-    estimatedDuration: 180,
-    description: "电机故障诊断与排除标准程序",
-    steps: [
-      { id: 1, title: "故障确认", description: "确认故障现象和范围", required: true },
-      { id: 2, title: "外观检查", description: "检查电机外观是否有明显损坏", required: true },
-      { id: 3, title: "电气测试", description: "测试电机电阻、绝缘", required: true },
-      { id: 4, title: "运转测试", description: "测试电机运转状态", required: true },
-      { id: 5, title: "故障处理", description: "根据测试结果进行维修或更换", required: true },
-    ],
-    requiredSkills: ["MECHANIC"],
-    requiredParts: [],
-    requiresRII: false,
-    isActive: true,
-    version: "v1.8",
-    lastModified: "2024-12-15T16:45:00",
-    modifiedBy: "李工程师",
-    usageCount: 67,
-  },
-];
+// Type definitions
+interface TaskCardStep {
+  id: number;
+  title: string;
+  description: string;
+  required: boolean;
+  isRII?: boolean;
+}
+
+interface RequiredPart {
+  partNumber: string;
+  quantity: number;
+  name: string;
+}
+
+interface TaskCardTemplate {
+  id: string;
+  name: string;
+  code: string;
+  category: string;
+  type: string;
+  intervalValue: number | null;
+  intervalUnit: string | null;
+  estimatedDuration: number;
+  description: string;
+  steps: TaskCardStep[];
+  requiredSkills: string[];
+  requiredParts: RequiredPart[];
+  requiresRII: boolean;
+  isActive: boolean;
+  version: string;
+  lastModified: string;
+  modifiedBy: string;
+  usageCount: number;
+}
 
 const CATEGORY_OPTIONS = [
   { value: "ALL", label: "全部类别" },
@@ -181,15 +81,36 @@ const TYPE_OPTIONS = [
 ];
 
 export function TaskCardTemplatesPage() {
+  const [templates, setTemplates] = useState<TaskCardTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [selectedType, setSelectedType] = useState("ALL");
   const [showInactive, setShowInactive] = useState(false);
   const [expandedTemplate, setExpandedTemplate] = useState<string | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<typeof MOCK_TEMPLATES[0] | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<TaskCardTemplate | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const filteredTemplates = MOCK_TEMPLATES.filter((template) => {
+  useEffect(() => {
+    // TODO: Replace with actual API call
+    // Example: taskCardTemplateService.getTemplates().then(setTemplates)
+    const loadTemplates = async () => {
+      setLoading(true);
+      try {
+        // Simulate API loading delay
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        // TODO: Fetch templates from API
+        setTemplates([]);
+      } catch (error) {
+        console.error("Failed to load task card templates:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadTemplates();
+  }, []);
+
+  const filteredTemplates = templates.filter((template) => {
     const matchesSearch =
       template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       template.code.toLowerCase().includes(searchQuery.toLowerCase());
@@ -199,12 +120,12 @@ export function TaskCardTemplatesPage() {
     return matchesSearch && matchesCategory && matchesType && matchesActive;
   });
 
-  const handleDuplicate = (template: typeof MOCK_TEMPLATES[0]) => {
+  const handleDuplicate = (template: TaskCardTemplate) => {
     console.log("Duplicating template:", template.id);
     // TODO: Implement duplicate functionality
   };
 
-  const handleDelete = (template: typeof MOCK_TEMPLATES[0]) => {
+  const handleDelete = (template: TaskCardTemplate) => {
     setSelectedTemplate(template);
     setShowDeleteDialog(true);
   };
@@ -285,7 +206,17 @@ export function TaskCardTemplatesPage() {
 
       {/* Template List */}
       <div className="space-y-4">
-        {filteredTemplates.length === 0 ? (
+        {loading ? (
+          <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+            <Loader2 className="w-12 h-12 text-blue-500 mx-auto mb-4 animate-spin" />
+            <p className="text-slate-500">加载中...</p>
+          </div>
+        ) : templates.length === 0 ? (
+          <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+            <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+            <p className="text-slate-500">暂无任务卡模板</p>
+          </div>
+        ) : filteredTemplates.length === 0 ? (
           <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
             <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
             <p className="text-slate-500">没有找到匹配的模板</p>

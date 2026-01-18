@@ -14,6 +14,7 @@ import {
   Download,
   AlertCircle,
   Info,
+  Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -43,6 +44,9 @@ import {
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { AircraftStatusBadge } from "../components/common/status-badge";
+import { componentService, Component } from "../services/component.service";
+import { fullAircraftService, Aircraft } from "../services/fleet.service";
+import { workOrderService, WorkOrder } from "../services/work-order.service";
 
 // Transfer types
 const TRANSFER_TYPES = [
@@ -54,111 +58,20 @@ const TRANSFER_TYPES = [
   { value: "RETURN", label: "返厂", description: "返回厂家", color: "bg-gray-100 text-gray-700" },
 ];
 
-// Mock component data
-const MOCK_COMPONENT = {
-  id: "comp-001",
-  serialNumber: "MOTOR-350-00156",
-  partNumber: "MOTOR-350-01",
-  name: "电机组件",
-  category: "动力系统",
-  manufacturer: "DJI",
-  manufactureDate: "2024-03-15",
-  specifications: {
-    voltage: "48V",
-    maxCurrent: "30A",
-    maxSpeed: "8000rpm",
-    weight: "280g",
-  },
-  totalFlightHours: 125.5,
-  totalCycles: 186,
-  status: "INSTALLED",
-  currentAircraft: {
-    id: "ac-001",
-    registration: "B-7011U",
-    model: "DJI M350 RTK",
-    position: "左前电机",
-  },
-  lastInspectionDate: "2025-12-01",
-  nextInspectionDate: "2026-03-01",
-};
-
-// Mock transfer history
-const MOCK_TRANSFER_HISTORY = [
-  {
-    id: "trans-001",
-    type: "INSTALLATION",
-    from: { type: "INVENTORY", name: "主仓库", location: "A-01-01" },
-    to: { type: "AIRCRAFT", id: "ac-001", name: "B-7011U", position: "左前电机" },
-    performedBy: "张三",
-    performedAt: "2025-10-15T10:30:00",
-    workOrderNumber: "WO-2025-1015",
-    notes: "定期更换",
-    flightHoursAtInstall: 0,
-    currentFlightHours: 125.5,
-  },
-  {
-    id: "trans-002",
-    type: "REMOVAL",
-    from: { type: "AIRCRAFT", id: "ac-002", name: "B-7012U", position: "右前电机" },
-    to: { type: "INVENTORY", name: "主仓库", location: "A-01-02" },
-    performedBy: "李四",
-    performedAt: "2025-10-14T14:00:00",
-    workOrderNumber: "WO-2025-1014",
-    notes: "发现异常磨损，预防性更换",
-    flightHoursAtInstall: 89.3,
-    currentFlightHours: 214.8,
-  },
-  {
-    id: "trans-003",
-    type: "INSTALLATION",
-    from: { type: "INVENTORY", name: "主仓库", location: "A-01-03" },
-    to: { type: "AIRCRAFT", id: "ac-002", name: "B-7012U", position: "右前电机" },
-    performedBy: "王五",
-    performedAt: "2025-06-20T09:00:00",
-    workOrderNumber: "WO-2025-0620",
-    notes: "新机装机",
-    flightHoursAtInstall: 0,
-    currentFlightHours: 89.3,
-  },
-  {
-    id: "trans-004",
-    type: "REPAIR",
-    from: { type: "AIRCRAFT", id: "ac-003", name: "B-7013U", position: "左前电机" },
-    to: { type: "VENDOR", name: "DJI维修中心", location: "深圳" },
-    performedBy: "赵六",
-    performedAt: "2025-05-10T11:00:00",
-    workOrderNumber: "WO-2025-0510",
-    notes: "轴承异响，送厂检修",
-    flightHoursAtInstall: 45.0,
-    currentFlightHours: 125.5,
-  },
-  {
-    id: "trans-005",
-    type: "INSTALLATION",
-    from: { type: "INVENTORY", name: "主仓库", location: "A-01-04" },
-    to: { type: "AIRCRAFT", id: "ac-003", name: "B-7013U", position: "左前电机" },
-    performedBy: "张三",
-    performedAt: "2025-03-01T14:30:00",
-    workOrderNumber: "WO-2025-0301",
-    notes: "新件首次安装",
-    flightHoursAtInstall: 0,
-    currentFlightHours: 45.0,
-  },
-];
-
-// Mock aircraft list
-const MOCK_AIRCRAFT = [
-  { id: "ac-001", registration: "B-7011U", model: "DJI M350 RTK", status: "SERVICEABLE" },
-  { id: "ac-002", registration: "B-7012U", model: "DJI M350 RTK", status: "SERVICEABLE" },
-  { id: "ac-003", registration: "B-7013U", model: "DJI M300 RTK", status: "MAINTENANCE" },
-  { id: "ac-004", registration: "B-7021U", model: "DJI Mavic 3E", status: "GROUNDED" },
-];
-
-// Mock work orders
-const MOCK_WORK_ORDERS = [
-  { id: "wo-001", number: "WO-2026-0116", title: "电机定期检查 - B-7011U" },
-  { id: "wo-002", number: "WO-2026-0115", title: "电机更换 - B-7012U" },
-];
+// Transfer history record interface
+// TODO: This interface should be moved to a service file once the transfer history API is implemented
+interface TransferRecord {
+  id: string;
+  type: string;
+  from: { type: string; id?: string; name: string; location?: string; position?: string };
+  to: { type: string; id?: string; name: string; location?: string; position?: string };
+  performedBy: string;
+  performedAt: string;
+  workOrderNumber?: string;
+  notes?: string;
+  flightHoursAtInstall: number;
+  currentFlightHours: number;
+}
 
 interface NewTransfer {
   type: string;
@@ -180,9 +93,21 @@ export function ComponentTransfersPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // State
-  const [component, setComponent] = useState(MOCK_COMPONENT);
-  const [transferHistory, setTransferHistory] = useState(MOCK_TRANSFER_HISTORY);
+  // Loading states
+  const [isLoadingComponent, setIsLoadingComponent] = useState(true);
+  const [isLoadingAircraft, setIsLoadingAircraft] = useState(true);
+  const [isLoadingWorkOrders, setIsLoadingWorkOrders] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Data states
+  const [component, setComponent] = useState<Component | null>(null);
+  const [aircraftList, setAircraftList] = useState<Aircraft[]>([]);
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  // TODO: Transfer history API needs to be implemented on the backend
+  // For now, using an empty array as placeholder
+  const [transferHistory, setTransferHistory] = useState<TransferRecord[]>([]);
+
+  // UI states
   const [showNewTransferDialog, setShowNewTransferDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -198,6 +123,60 @@ export function ComponentTransfersPage() {
     notes: "",
     performedAt: new Date().toISOString().slice(0, 16),
   });
+
+  // Fetch component data
+  useEffect(() => {
+    async function fetchComponent() {
+      if (!id) return;
+      setIsLoadingComponent(true);
+      setError(null);
+      try {
+        const data = await componentService.getById(id);
+        setComponent(data);
+      } catch (err) {
+        console.error("Failed to fetch component:", err);
+        setError("加载零部件信息失败");
+      } finally {
+        setIsLoadingComponent(false);
+      }
+    }
+    fetchComponent();
+  }, [id]);
+
+  // Fetch aircraft list
+  useEffect(() => {
+    async function fetchAircraft() {
+      setIsLoadingAircraft(true);
+      try {
+        const data = await fullAircraftService.list();
+        setAircraftList(data);
+      } catch (err) {
+        console.error("Failed to fetch aircraft list:", err);
+      } finally {
+        setIsLoadingAircraft(false);
+      }
+    }
+    fetchAircraft();
+  }, []);
+
+  // Fetch work orders
+  useEffect(() => {
+    async function fetchWorkOrders() {
+      setIsLoadingWorkOrders(true);
+      try {
+        const data = await workOrderService.list();
+        setWorkOrders(data);
+      } catch (err) {
+        console.error("Failed to fetch work orders:", err);
+      } finally {
+        setIsLoadingWorkOrders(false);
+      }
+    }
+    fetchWorkOrders();
+  }, []);
+
+  // Derived loading state
+  const isLoading = isLoadingComponent || isLoadingAircraft || isLoadingWorkOrders;
 
   // Filter history
   const filteredHistory = transferHistory.filter((transfer) => {
@@ -240,146 +219,153 @@ export function ComponentTransfersPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline">
+          <Button variant="outline" disabled={isLoading}>
             <Download className="w-4 h-4 mr-2" />
             导出履历
           </Button>
-          <Button onClick={() => setShowNewTransferDialog(true)}>
+          <Button onClick={() => setShowNewTransferDialog(true)} disabled={isLoading}>
             <Plus className="w-4 h-4 mr-2" />
             新增记录
           </Button>
         </div>
       </div>
 
-      {/* Component Info Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div>
-              <CardTitle>零部件信息</CardTitle>
-              <CardDescription>当前追踪的零部件详情</CardDescription>
-            </div>
-            <Badge className="bg-green-100 text-green-700">
-              {component.status === "INSTALLED" ? "已安装" : "库存中"}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">序列号</p>
-              <p className="font-mono font-medium">{component.serialNumber}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">件号</p>
-              <p className="font-mono text-sm">{component.partNumber}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">名称</p>
-              <p className="font-medium">{component.name}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">制造商</p>
-              <p className="font-medium">{component.manufacturer}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">生产日期</p>
-              <p className="text-sm">{component.manufactureDate}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">累计飞行小时</p>
-              <p className="font-medium">{component.totalFlightHours} h</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">累计起降循环</p>
-              <p className="font-medium">{component.totalCycles} 次</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">下次检查</p>
-              <p className="text-sm">{component.nextInspectionDate}</p>
-            </div>
-          </div>
+      {/* Loading State */}
+      {isLoadingComponent && (
+        <Card>
+          <CardContent className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <span className="ml-2 text-muted-foreground">加载中...</span>
+          </CardContent>
+        </Card>
+      )}
 
-          {/* Current Location */}
-          {component.currentAircraft && (
-            <div className="mt-4 p-3 bg-green-50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Plane className="h-5 w-5 text-green-600" />
-                  <div>
-                    <p className="text-sm font-medium text-green-900">
-                      当前安装于: {component.currentAircraft.registration}
-                    </p>
-                    <p className="text-xs text-green-700">
-                      {component.currentAircraft.model} · {component.currentAircraft.position}
-                    </p>
-                  </div>
-                </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link to={`/aircraft/${component.currentAircraft.id}`}>
-                    查看飞机
-                  </Link>
-                </Button>
+      {/* Error State */}
+      {error && !isLoadingComponent && (
+        <Card>
+          <CardContent className="flex items-center justify-center py-12">
+            <AlertCircle className="h-8 w-8 text-red-500" />
+            <span className="ml-2 text-red-500">{error}</span>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Component Info Card */}
+      {component && !isLoadingComponent && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle>零部件信息</CardTitle>
+                <CardDescription>当前追踪的零部件详情</CardDescription>
+              </div>
+              <Badge className="bg-green-100 text-green-700">
+                {component.status === "IN_USE" ? "已安装" : "库存中"}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">序列号</p>
+                <p className="font-mono font-medium">{component.serialNumber}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">件号</p>
+                <p className="font-mono text-sm">{component.partNumber}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">名称</p>
+                <p className="font-medium">{component.model || component.type}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">制造商</p>
+                <p className="font-medium">{component.manufacturer}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">生产日期</p>
+                <p className="text-sm">
+                  {component.manufacturedAt
+                    ? new Date(component.manufacturedAt).toLocaleDateString("zh-CN")
+                    : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">累计飞行小时</p>
+                <p className="font-medium">{component.totalFlightHours} h</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">累计起降循环</p>
+                <p className="font-medium">{component.totalFlightCycles} 次</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">适航状态</p>
+                <p className="text-sm">{component.isAirworthy ? "适航" : "不适航"}</p>
               </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {/* Current Location - Note: currentAircraft info not available from component API, would need separate query */}
+            {/* TODO: Add current aircraft installation info when component installation API is available */}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Lifecycle Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              累计安装次数
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">
-              {transferHistory.filter((t) => t.type === "INSTALLATION").length}
-            </p>
-          </CardContent>
-        </Card>
+      {component && !isLoadingComponent && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                累计安装次数
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">
+                {transferHistory.filter((t) => t.type === "INSTALLATION").length}
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              累计使用飞机
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">
-              {new Set(
-                transferHistory
-                  .filter((t) => t.to.type === "AIRCRAFT")
-                  .map((t) => t.to.id)
-              ).size}
-            </p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                累计使用飞机
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">
+                {new Set(
+                  transferHistory
+                    .filter((t) => t.to.type === "AIRCRAFT")
+                    .map((t) => t.to.id)
+                ).size}
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              总服役时长
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{component.totalFlightHours} h</p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                总服役时长
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{component.totalFlightHours} h</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              历史记录
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{transferHistory.length}</p>
-          </CardContent>
-        </Card>
-      </div>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                历史记录
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{transferHistory.length}</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Transfer History */}
       <Card>
@@ -600,14 +586,15 @@ export function ComponentTransfersPage() {
                   <Select
                     value={newTransfer.fromId}
                     onValueChange={(value) => setNewTransfer({ ...newTransfer, fromId: value })}
+                    disabled={isLoadingAircraft}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="选择飞机" />
+                      <SelectValue placeholder={isLoadingAircraft ? "加载中..." : "选择飞机"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {MOCK_AIRCRAFT.map((ac) => (
+                      {aircraftList.map((ac) => (
                         <SelectItem key={ac.id} value={ac.id}>
-                          {ac.registration}
+                          {ac.registrationNumber}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -650,14 +637,15 @@ export function ComponentTransfersPage() {
                   <Select
                     value={newTransfer.toId}
                     onValueChange={(value) => setNewTransfer({ ...newTransfer, toId: value })}
+                    disabled={isLoadingAircraft}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="选择飞机" />
+                      <SelectValue placeholder={isLoadingAircraft ? "加载中..." : "选择飞机"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {MOCK_AIRCRAFT.map((ac) => (
+                      {aircraftList.map((ac) => (
                         <SelectItem key={ac.id} value={ac.id}>
-                          {ac.registration}
+                          {ac.registrationNumber}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -686,15 +674,16 @@ export function ComponentTransfersPage() {
               <Select
                 value={newTransfer.workOrderId}
                 onValueChange={(value) => setNewTransfer({ ...newTransfer, workOrderId: value })}
+                disabled={isLoadingWorkOrders}
               >
                 <SelectTrigger id="workOrder">
-                  <SelectValue placeholder="选择工单（可选）" />
+                  <SelectValue placeholder={isLoadingWorkOrders ? "加载中..." : "选择工单（可选）"} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">无关联</SelectItem>
-                  {MOCK_WORK_ORDERS.map((wo) => (
+                  {workOrders.map((wo) => (
                     <SelectItem key={wo.id} value={wo.id}>
-                      {wo.number} - {wo.title}
+                      {wo.orderNumber} - {wo.title}
                     </SelectItem>
                   ))}
                 </SelectContent>

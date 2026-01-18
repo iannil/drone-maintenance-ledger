@@ -16,9 +16,11 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { authStore } from "../stores/auth.store";
-import { statsService, DashboardStats, RecentActivity, DueMaintenanceItem } from "../services/stats.service";
+import { statsService, DashboardStats, RecentActivity, DueMaintenanceItem, AircraftLocationData } from "../services/stats.service";
 import { maintenanceSchedulerService, MaintenanceAlert } from "../services/maintenance-scheduler.service";
 import { inventoryService, InventoryAlerts } from "../services/inventory.service";
+import { FaultHeatmap } from "../components/charts";
+import { FleetMap } from "../components/map";
 
 /**
  * Format relative time from ISO date string
@@ -47,24 +49,27 @@ export function DashboardPage() {
   const [dueMaintenanceItems, setDueMaintenanceItems] = useState<DueMaintenanceItem[]>([]);
   const [maintenanceAlerts, setMaintenanceAlerts] = useState<MaintenanceAlert[]>([]);
   const [inventoryAlerts, setInventoryAlerts] = useState<InventoryAlerts | null>(null);
+  const [fleetLocations, setFleetLocations] = useState<AircraftLocationData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function loadDashboardData() {
       setIsLoading(true);
       try {
-        const [statsData, activitiesData, maintenanceData, schedulerAlerts, invAlerts] = await Promise.all([
+        const [statsData, activitiesData, maintenanceData, schedulerAlerts, invAlerts, locationsData] = await Promise.all([
           statsService.getDashboardStats(),
           statsService.getRecentActivities(10),
           statsService.getDueMaintenanceItems(5),
           maintenanceSchedulerService.getAlerts({ limit: 5 }).catch(() => []),
           inventoryService.getAlerts().catch(() => ({ lowStock: [], expiring: [] })),
+          statsService.getFleetLocations().catch(() => ({ aircraft: [], lastUpdated: Date.now() })),
         ]);
         setStats(statsData);
         setActivities(activitiesData);
         setDueMaintenanceItems(maintenanceData);
         setMaintenanceAlerts(schedulerAlerts);
         setInventoryAlerts(invAlerts);
+        setFleetLocations(locationsData.aircraft);
       } catch (error) {
         console.error("Failed to load dashboard data:", error);
       } finally {
@@ -376,6 +381,23 @@ export function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Fault Heatmap */}
+      <FaultHeatmap days={365} />
+
+      {/* Fleet Map */}
+      <FleetMap
+        locations={fleetLocations}
+        loading={isLoading}
+        onRefresh={async () => {
+          try {
+            const locationsData = await statsService.getFleetLocations();
+            setFleetLocations(locationsData.aircraft);
+          } catch (error) {
+            console.error("Failed to refresh fleet locations:", error);
+          }
+        }}
+      />
 
       {/* Quick Actions */}
       <Card>

@@ -39,6 +39,9 @@ import {
   COMPONENT_STATUS_LABELS,
   STATUS_DISPLAY_MAP,
 } from "../services/component.service";
+import { flightLogService, FlightLog, FLIGHT_TYPE_LABELS } from "../services/flight-log.service";
+import { workOrderService, WorkOrder, WORK_ORDER_TYPE_LABELS } from "../services/work-order.service";
+import { userService, User } from "../services/user.service";
 import { ComponentStatusBadge } from "../components/common/status-badge";
 
 /**
@@ -60,6 +63,9 @@ export function AircraftDetailPage() {
   const [aircraft, setAircraft] = useState<Aircraft | null>(null);
   const [fleet, setFleet] = useState<Fleet | null>(null);
   const [components, setComponents] = useState<Component[]>([]);
+  const [flightLogs, setFlightLogs] = useState<FlightLog[]>([]);
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [pilots, setPilots] = useState<Map<string, User>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,6 +96,35 @@ export function AircraftDetailPage() {
         } catch {
           console.warn("Failed to load components");
         }
+
+        // Load flight logs
+        try {
+          const flightLogsData = await flightLogService.getByAircraft(id, 10);
+          setFlightLogs(flightLogsData);
+
+          // Load pilot info for flight logs
+          const pilotIds = new Set(flightLogsData.map((fl) => fl.pilotId));
+          const pilotMap = new Map<string, User>();
+          for (const pilotId of pilotIds) {
+            try {
+              const pilot = await userService.getById(pilotId);
+              pilotMap.set(pilotId, pilot);
+            } catch {
+              // Ignore pilot not found
+            }
+          }
+          setPilots(pilotMap);
+        } catch {
+          console.warn("Failed to load flight logs");
+        }
+
+        // Load work orders (maintenance history)
+        try {
+          const workOrdersData = await workOrderService.getByAircraft(id, 10);
+          setWorkOrders(workOrdersData);
+        } catch {
+          console.warn("Failed to load work orders");
+        }
       } catch (err) {
         console.error("Failed to load aircraft:", err);
         setError("无法加载飞机信息");
@@ -100,31 +135,12 @@ export function AircraftDetailPage() {
     loadData();
   }, [id]);
 
-  // Mock maintenance history - TODO: Add API endpoint
-  const maintenanceHistory = [
-    {
-      id: "maint-001",
-      date: "2026-01-10",
-      type: "定期检查",
-      description: "100小时定期检查",
-      technician: "李四",
-      status: "completed",
-    },
-  ];
-
-  // Mock flight logs - TODO: Add API endpoint
-  const recentFlights = [
-    {
-      id: "flight-001",
-      date: "2026-01-15",
-      pilot: "张三",
-      duration: "1h 25m",
-      flightHours: 1.42,
-      takeoffLocation: "基地",
-      landingLocation: "基地",
-      purpose: "电力巡检",
-    },
-  ];
+  // Helper functions
+  const formatFlightDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
+  };
 
   if (isLoading) {
     return (
@@ -432,7 +448,7 @@ export function AircraftDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {recentFlights.map((flight) => (
+                {flightLogs.map((flight) => (
                   <div
                     key={flight.id}
                     className="flex items-center justify-between p-4 rounded-lg border"
@@ -442,22 +458,24 @@ export function AircraftDetailPage() {
                         <Activity className="w-5 h-5 text-primary" />
                       </div>
                       <div>
-                        <p className="font-medium">{flight.purpose}</p>
+                        <p className="font-medium">
+                          {flight.missionDescription || FLIGHT_TYPE_LABELS[flight.flightType]}
+                        </p>
                         <p className="text-sm text-muted-foreground">
-                          {flight.date} · 飞行员: {flight.pilot}
+                          {new Date(flight.flightDate).toLocaleDateString("zh-CN")} · 飞行员: {pilots.get(flight.pilotId)?.name || "未知"}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium">{flight.duration}</p>
+                      <p className="font-medium">{formatFlightDuration(flight.flightDuration)}</p>
                       <p className="text-sm text-muted-foreground">
-                        {flight.flightHours}h
+                        {flight.flightHours.toFixed(2)}h
                       </p>
                     </div>
                   </div>
                 ))}
 
-                {recentFlights.length === 0 && (
+                {flightLogs.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     暂无飞行记录
                   </div>
@@ -474,42 +492,52 @@ export function AircraftDetailPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>维保历史</CardTitle>
-                  <CardDescription>过去的维保记录</CardDescription>
+                  <CardDescription>过去的维保记录（工单）</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
-                  <History className="w-4 h-4 mr-2" />
-                  导出记录
+                <Button variant="outline" size="sm" asChild>
+                  <Link to={`/work-orders?aircraft=${aircraft.id}`}>
+                    <History className="w-4 h-4 mr-2" />
+                    查看全部
+                  </Link>
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {maintenanceHistory.map((record) => (
-                  <div key={record.id} className="flex gap-4 p-4 rounded-lg border">
+                {workOrders.map((wo) => (
+                  <div key={wo.id} className="flex gap-4 p-4 rounded-lg border">
                     <div className="w-12 h-12 rounded-lg bg-muted flex flex-col items-center justify-center">
                       <span className="text-xs font-medium">
-                        {new Date(record.date).toLocaleDateString("zh-CN", { month: "short" })}
+                        {new Date(wo.createdAt).toLocaleDateString("zh-CN", { month: "short" })}
                       </span>
                       <span className="text-lg font-bold">
-                        {new Date(record.date).getDate()}
+                        {new Date(wo.createdAt).getDate()}
                       </span>
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium">{record.type}</p>
+                        <Link
+                          to={`/work-orders/${wo.id}`}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {wo.title}
+                        </Link>
                         <Badge variant="outline" className="text-xs">
-                          {record.status === "completed" ? "已完成" : "进行中"}
+                          {WORK_ORDER_TYPE_LABELS[wo.type]}
+                        </Badge>
+                        <Badge
+                          variant={wo.status === "COMPLETED" || wo.status === "RELEASED" ? "default" : "secondary"}
+                          className="text-xs"
+                        >
+                          {wo.status === "COMPLETED" || wo.status === "RELEASED" ? "已完成" : "进行中"}
                         </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground">{record.description}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        技术员: {record.technician}
-                      </p>
+                      <p className="text-sm text-muted-foreground">{wo.description || wo.orderNumber}</p>
                     </div>
                   </div>
                 ))}
 
-                {maintenanceHistory.length === 0 && (
+                {workOrders.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     暂无维保记录
                   </div>

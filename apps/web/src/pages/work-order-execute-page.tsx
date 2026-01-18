@@ -8,20 +8,18 @@ import {
   Send,
   Clock,
   AlertCircle,
-  User,
+  User as UserIcon,
   Calendar,
   Wrench,
   FileText,
-  Save,
-  Plus,
   X,
   ChevronRight,
   ChevronLeft,
+  Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
-import { Input } from "../components/ui/input";
 import {
   Card,
   CardContent,
@@ -30,7 +28,6 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -40,116 +37,23 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { AircraftStatusBadge } from "../components/common/status-badge";
+import {
+  workOrderService,
+  WorkOrder,
+  WorkOrderTask,
+} from "../services/work-order.service";
+import { fullAircraftService, Aircraft } from "../services/fleet.service";
+import { userService, User } from "../services/user.service";
 
-// Mock work order data
-const MOCK_WORK_ORDER = {
-  id: "wo-001",
-  workOrderNumber: "WO-2026-0116",
-  title: "电机定期检查 - B-7011U",
-  description: "每50飞行小时检查电机状态，测试电机转速和温度",
-  type: "SCHEDULED",
-  priority: "HIGH",
-  status: "IN_PROGRESS",
-  aircraftId: "ac-001",
-  aircraftRegistration: "B-7011U",
-  aircraftModel: "DJI M350 RTK",
-  scheduleId: "ms-001",
-  scheduleName: "电机定期检查",
-  assignedTo: "张三",
-  createdBy: "系统",
-  createdAt: "2026-01-15T09:00:00",
-  dueDate: "2026-01-20T18:00:00",
-  startedAt: "2026-01-15T10:30:00",
-  completedAt: null,
-  estimatedHours: 2,
-  actualHours: 0,
-  notes: "",
-  tasks: [
-    {
-      id: "task-001",
-      title: "外观检查 - 左前电机",
-      description: "检查电机外观是否有损伤、裂纹或异物，检查固定螺丝是否松动",
-      isRii: false,
-      status: "PENDING",
-      completedBy: null,
-      completedAt: null,
-      photos: [],
-      notes: "",
-    },
-    {
-      id: "task-002",
-      title: "外观检查 - 右前电机",
-      description: "检查电机外观是否有损伤、裂纹或异物，检查固定螺丝是否松动",
-      isRii: false,
-      status: "PENDING",
-      completedBy: null,
-      completedAt: null,
-      photos: [],
-      notes: "",
-    },
-    {
-      id: "task-003",
-      title: "外观检查 - 左后电机",
-      description: "检查电机外观是否有损伤、裂纹或异物，检查固定螺丝是否松动",
-      isRii: false,
-      status: "PENDING",
-      completedBy: null,
-      completedAt: null,
-      photos: [],
-      notes: "",
-    },
-    {
-      id: "task-004",
-      title: "外观检查 - 右后电机",
-      description: "检查电机外观是否有损伤、裂纹或异物，检查固定螺丝是否松动",
-      isRii: false,
-      status: "PENDING",
-      completedBy: null,
-      completedAt: null,
-      photos: [],
-      notes: "",
-    },
-    {
-      id: "task-005",
-      title: "转速测试 - 左前电机",
-      description: "测试电机最大转速，检查是否平稳，有无异响",
-      isRii: true,
-      status: "PENDING",
-      completedBy: null,
-      completedAt: null,
-      photos: [],
-      notes: "",
-      inspector: null,
-      inspectedAt: null,
-    },
-    {
-      id: "task-006",
-      title: "转速测试 - 右前电机",
-      description: "测试电机最大转速，检查是否平稳，有无异响",
-      isRii: true,
-      status: "PENDING",
-      completedBy: null,
-      completedAt: null,
-      photos: [],
-      notes: "",
-      inspector: null,
-      inspectedAt: null,
-    },
-    {
-      id: "task-007",
-      title: "温度检查",
-      description: "检查电机工作温度是否在正常范围内",
-      isRii: false,
-      status: "PENDING",
-      completedBy: null,
-      completedAt: null,
-      photos: [],
-      notes: "",
-    },
-  ],
-  partsUsed: [],
-  attachments: [],
-};
+/**
+ * Extended work order data for execute page
+ */
+interface WorkOrderExecuteData {
+  workOrder: WorkOrder;
+  tasks: WorkOrderTask[];
+  aircraft: Aircraft | null;
+  assignee: User | null;
+}
 
 interface TaskExecution {
   taskId: string;
@@ -166,14 +70,79 @@ export function WorkOrderExecutePage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
+  // Data loading state
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<WorkOrderExecuteData | null>(null);
+
   // State
-  const [workOrder, setWorkOrder] = useState(MOCK_WORK_ORDER);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [taskExecutions, setTaskExecutions] = useState<Record<string, TaskExecution>>({});
   const [showPhotoDialog, setShowPhotoDialog] = useState(false);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [selectedPhotoTask, setSelectedPhotoTask] = useState<string | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0); // in minutes
+
+  // Load work order data on mount
+  useEffect(() => {
+    async function loadData() {
+      if (!id) {
+        setError("工单ID不存在");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Load work order and tasks in parallel
+        const [workOrder, tasks] = await Promise.all([
+          workOrderService.getById(id),
+          workOrderService.getTasks(id),
+        ]);
+
+        // Load aircraft data if available
+        let aircraft: Aircraft | null = null;
+        if (workOrder.aircraftId) {
+          try {
+            aircraft = await fullAircraftService.getById(workOrder.aircraftId);
+          } catch {
+            // Aircraft lookup failed, continue without it
+            console.warn("Failed to load aircraft data");
+          }
+        }
+
+        // Load assignee data if available
+        let assignee: User | null = null;
+        if (workOrder.assignedTo) {
+          try {
+            assignee = await userService.getById(workOrder.assignedTo);
+          } catch {
+            // User lookup failed, continue without it
+            console.warn("Failed to load assignee data");
+          }
+        }
+
+        // Sort tasks by sequence
+        const sortedTasks = [...tasks].sort((a, b) => a.sequence - b.sequence);
+
+        setData({
+          workOrder,
+          tasks: sortedTasks,
+          aircraft,
+          assignee,
+        });
+      } catch (err) {
+        console.error("Failed to load work order:", err);
+        setError(err instanceof Error ? err.message : "加载工单数据失败");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
+  }, [id]);
 
   // Timer for tracking work time
   useEffect(() => {
@@ -183,7 +152,43 @@ export function WorkOrderExecutePage() {
     return () => clearInterval(interval);
   }, []);
 
-  const currentTask = workOrder.tasks[currentTaskIndex];
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <AlertCircle className="h-12 w-12 text-red-500" />
+        <p className="text-red-600 text-lg">{error || "加载工单数据失败"}</p>
+        <Button variant="outline" onClick={() => navigate(-1)}>
+          返回
+        </Button>
+      </div>
+    );
+  }
+
+  // No tasks state
+  if (data.tasks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <AlertCircle className="h-12 w-12 text-yellow-500" />
+        <p className="text-slate-600 text-lg">该工单暂无任务</p>
+        <Button variant="outline" asChild>
+          <Link to={`/work-orders/${id}`}>返回工单详情</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  const { workOrder, tasks, aircraft, assignee } = data;
+  const currentTask = tasks[currentTaskIndex];
   const currentExecution: TaskExecution = taskExecutions[currentTask.id] || {
     taskId: currentTask.id,
     status: currentTask.status as "PENDING" | "IN_PROGRESS" | "COMPLETED",
@@ -193,11 +198,11 @@ export function WorkOrderExecutePage() {
   };
 
   // Calculate progress
-  const completedTasks = workOrder.tasks.filter((t) => {
+  const completedTasks = tasks.filter((t) => {
     const exec = taskExecutions[t.id];
     return exec?.status === "COMPLETED" || t.status === "COMPLETED";
   }).length;
-  const progress = (completedTasks / workOrder.tasks.length) * 100;
+  const progress = (completedTasks / tasks.length) * 100;
 
   // Navigate tasks
   const goToTask = (index: number) => {
@@ -205,7 +210,7 @@ export function WorkOrderExecutePage() {
   };
 
   const goToNextTask = () => {
-    if (currentTaskIndex < workOrder.tasks.length - 1) {
+    if (currentTaskIndex < tasks.length - 1) {
       setCurrentTaskIndex(currentTaskIndex + 1);
     }
   };
@@ -235,7 +240,7 @@ export function WorkOrderExecutePage() {
     });
     // Auto advance to next task after short delay
     setTimeout(() => {
-      if (currentTaskIndex < workOrder.tasks.length - 1) {
+      if (currentTaskIndex < tasks.length - 1) {
         goToNextTask();
       }
     }, 500);
@@ -291,7 +296,7 @@ export function WorkOrderExecutePage() {
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-slate-900">{workOrder.title}</h1>
           <p className="text-muted-foreground">
-            {workOrder.workOrderNumber} · 任务执行
+            {workOrder.orderNumber} · 任务执行
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -310,10 +315,10 @@ export function WorkOrderExecutePage() {
         <CardContent className="p-4">
           <div className="flex flex-wrap items-center gap-6">
             <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
+              <UserIcon className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">
                 <span className="text-muted-foreground">负责人:</span>
-                <span className="font-medium ml-1">{workOrder.assignedTo}</span>
+                <span className="font-medium ml-1">{assignee?.name || "未分配"}</span>
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -321,7 +326,9 @@ export function WorkOrderExecutePage() {
               <span className="text-sm">
                 <span className="text-muted-foreground">到期:</span>
                 <span className="font-medium ml-1">
-                  {new Date(workOrder.dueDate).toLocaleDateString("zh-CN")}
+                  {workOrder.scheduledEnd
+                    ? new Date(workOrder.scheduledEnd).toLocaleDateString("zh-CN")
+                    : "未设置"}
                 </span>
               </span>
             </div>
@@ -336,17 +343,19 @@ export function WorkOrderExecutePage() {
               <Wrench className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">
                 <span className="text-muted-foreground">进度:</span>
-                <span className="font-medium ml-1">{completedTasks}/{workOrder.tasks.length}</span>
+                <span className="font-medium ml-1">{completedTasks}/{tasks.length}</span>
               </span>
             </div>
             <div className="flex-1" />
-            <Link
-              to={`/aircraft/${workOrder.aircraftId}`}
-              className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-            >
-              {workOrder.aircraftRegistration}
-              <AircraftStatusBadge status="SERVICEABLE" />
-            </Link>
+            {aircraft && (
+              <Link
+                to={`/aircraft/${workOrder.aircraftId}`}
+                className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+              >
+                {aircraft.registrationNumber}
+                <AircraftStatusBadge status={aircraft.status === "AVAILABLE" ? "SERVICEABLE" : aircraft.status === "IN_MAINTENANCE" ? "MAINTENANCE" : aircraft.status === "AOG" ? "GROUNDED" : "RETIRED"} />
+              </Link>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -377,7 +386,7 @@ export function WorkOrderExecutePage() {
                 <div>
                   <div className="flex items-center gap-3 mb-2">
                     <CardTitle className="text-xl">
-                      任务 {currentTaskIndex + 1} / {workOrder.tasks.length}
+                      任务 {currentTaskIndex + 1} / {tasks.length}
                     </CardTitle>
                     {currentTask.isRii && (
                       <Badge variant="outline" className="border-red-500 text-red-700">
@@ -520,7 +529,7 @@ export function WorkOrderExecutePage() {
                 <Button
                   variant="outline"
                   onClick={goToNextTask}
-                  disabled={currentTaskIndex === workOrder.tasks.length - 1}
+                  disabled={currentTaskIndex === tasks.length - 1}
                 >
                   下一任务
                   <ChevronRight className="h-4 w-4 ml-1" />
@@ -559,12 +568,12 @@ export function WorkOrderExecutePage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base">任务列表</CardTitle>
               <CardDescription>
-                已完成 {completedTasks} / {workOrder.tasks.length}
+                已完成 {completedTasks} / {tasks.length}
               </CardDescription>
             </CardHeader>
             <CardContent className="p-2">
               <div className="space-y-1">
-                {workOrder.tasks.map((task, index) => {
+                {tasks.map((task, index) => {
                   const exec = taskExecutions[task.id];
                   const isCompleted = exec?.status === "COMPLETED" || task.status === "COMPLETED";
                   const isCurrent = index === currentTaskIndex;
@@ -689,7 +698,7 @@ export function WorkOrderExecutePage() {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground">完成任务</p>
-                <p className="font-medium">{completedTasks} / {workOrder.tasks.length}</p>
+                <p className="font-medium">{completedTasks} / {tasks.length}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">工作时长</p>
@@ -697,7 +706,7 @@ export function WorkOrderExecutePage() {
               </div>
             </div>
 
-            {completedTasks < workOrder.tasks.length && (
+            {completedTasks < tasks.length && (
               <div className="flex items-start gap-2 p-3 bg-amber-50 rounded text-amber-800 text-sm">
                 <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
                 <div>
@@ -710,7 +719,7 @@ export function WorkOrderExecutePage() {
             )}
 
             {/* Check for RII tasks */}
-            {workOrder.tasks.filter((t) => t.isRii).length > 0 && (
+            {tasks.filter((t) => t.isRii).length > 0 && (
               <div className="p-3 bg-blue-50 rounded text-blue-800 text-sm">
                 <p className="font-medium">包含必检项任务</p>
                 <p className="text-xs mt-1">

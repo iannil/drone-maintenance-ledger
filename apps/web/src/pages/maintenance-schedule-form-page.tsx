@@ -13,6 +13,7 @@ import {
   FileText,
   Wrench,
   Shield,
+  Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -42,13 +43,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
+import {
+  maintenanceSchedulerService,
+  type TriggerType,
+} from "../services/maintenance-scheduler.service";
 
 // Trigger types
-const TRIGGER_TYPES = [
-  { value: "FH", label: "飞行小时", icon: Clock, description: "每X飞行小时执行一次" },
-  { value: "FC", label: "起降循环", icon: RotateCcw, description: "每X次起降执行一次" },
-  { value: "CALENDAR", label: "日历时间", icon: Calendar, description: "每X天执行一次" },
-  { value: "BATTERY", label: "电池循环", icon: Settings, description: "每X次充放电执行一次" },
+const TRIGGER_TYPES: { value: TriggerType | "MANUAL"; label: string; icon: typeof Clock; description: string }[] = [
+  { value: "FLIGHT_HOURS", label: "飞行小时", icon: Clock, description: "每X飞行小时执行一次" },
+  { value: "FLIGHT_CYCLES", label: "起降循环", icon: RotateCcw, description: "每X次起降执行一次" },
+  { value: "CALENDAR_DAYS", label: "日历时间", icon: Calendar, description: "每X天执行一次" },
+  { value: "BATTERY_CYCLES", label: "电池循环", icon: Settings, description: "每X次充放电执行一次" },
   { value: "MANUAL", label: "手动触发", icon: Wrench, description: "不自动触发" },
 ];
 
@@ -94,7 +99,7 @@ interface ScheduleTask {
 interface ScheduleFormData {
   name: string;
   description: string;
-  triggerType: string;
+  triggerType: TriggerType | "MANUAL";
   triggerValue: number;
   triggerUnit: string;
   applicableModels: string[];
@@ -113,11 +118,15 @@ export function MaintenanceScheduleFormPage() {
   const navigate = useNavigate();
   const isEditing = Boolean(id);
 
+  // API 状态
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   // Form state
   const [formData, setFormData] = useState<ScheduleFormData>({
     name: "",
     description: "",
-    triggerType: "FH",
+    triggerType: "FLIGHT_HOURS",
     triggerValue: 50,
     triggerUnit: "小时",
     applicableModels: [],
@@ -164,11 +173,43 @@ export function MaintenanceScheduleFormPage() {
   };
 
   // Handle form submission
-  const handleSubmit = () => {
-    if (validateForm()) {
-      console.log("Submit maintenance schedule:", formData);
-      // TODO: API call to create/update schedule
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      // 首先创建 program
+      const programCode = `MP-${Date.now()}`;
+      const program = await maintenanceSchedulerService.createProgram({
+        name: formData.name,
+        code: programCode,
+        description: formData.description,
+        aircraftModel: formData.applicableModels.join(","),
+        isDefault: false,
+      });
+
+      // 然后创建 trigger（如果不是手动触发）
+      if (formData.triggerType !== "MANUAL") {
+        const triggerCode = `TR-${Date.now()}`;
+        await maintenanceSchedulerService.createTrigger({
+          programId: program.id,
+          name: `${formData.name} 触发器`,
+          code: triggerCode,
+          description: `自动触发: 每 ${formData.triggerValue} ${formData.triggerUnit}`,
+          type: formData.triggerType,
+          intervalValue: formData.triggerValue,
+          warningThreshold: Math.floor(formData.triggerValue * 0.1),
+        });
+      }
+
       navigate("/maintenance/schedules");
+    } catch (err) {
+      console.error("Submit error:", err);
+      setSubmitError(err instanceof Error ? err.message : "提交失败，请重试");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -245,10 +286,10 @@ export function MaintenanceScheduleFormPage() {
   // Get trigger unit
   const getTriggerUnit = (triggerType: string) => {
     switch (triggerType) {
-      case "FH": return "小时";
-      case "FC": return "次";
-      case "CALENDAR": return "天";
-      case "BATTERY": return "次";
+      case "FLIGHT_HOURS": return "小时";
+      case "FLIGHT_CYCLES": return "次";
+      case "CALENDAR_DAYS": return "天";
+      case "BATTERY_CYCLES": return "次";
       default: return "";
     }
   };
@@ -282,12 +323,36 @@ export function MaintenanceScheduleFormPage() {
           <Button variant="outline" onClick={() => navigate("/maintenance/schedules")}>
             取消
           </Button>
-          <Button onClick={handleSubmit}>
-            <Save className="w-4 h-4 mr-2" />
-            {isEditing ? "保存修改" : "创建计划"}
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                提交中...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                {isEditing ? "保存修改" : "创建计划"}
+              </>
+            )}
           </Button>
         </div>
       </div>
+
+      {/* Submit error */}
+      {submitError && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-red-800">提交失败</p>
+                <p className="text-sm text-red-700">{submitError}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Form */}
@@ -376,7 +441,7 @@ export function MaintenanceScheduleFormPage() {
                 <Label htmlFor="triggerType">触发类型 *</Label>
                 <Select
                   value={formData.triggerType}
-                  onValueChange={(value) => updateField("triggerType", value)}
+                  onValueChange={(value) => updateField("triggerType", value as TriggerType | "MANUAL")}
                 >
                   <SelectTrigger id="triggerType">
                     <SelectValue />

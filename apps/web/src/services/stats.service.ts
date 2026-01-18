@@ -44,6 +44,86 @@ export interface DueMaintenanceItem {
 }
 
 /**
+ * Fault heatmap data for visualization
+ */
+export interface FaultHeatmapData {
+  byAircraftModel: { model: string; faultCount: number }[];
+  bySystem: { system: string; faultCount: number }[];
+  bySeverity: { severity: string; count: number }[];
+  byMonth: { month: string; count: number }[];
+  totalFaults: number;
+  openFaults: number;
+  criticalFaults: number;
+}
+
+/**
+ * Aircraft location data for map view
+ */
+export interface AircraftLocationData {
+  id: string;
+  registrationNumber: string;
+  model: string;
+  status: string;
+  latitude: number;
+  longitude: number;
+  lastFlightDate?: string;
+  totalFlightHours?: number;
+}
+
+/**
+ * Fleet locations response
+ */
+export interface FleetLocationsData {
+  aircraft: AircraftLocationData[];
+  lastUpdated: number;
+}
+
+/**
+ * Reliability data for analysis page
+ */
+export interface ReliabilityData {
+  summary: {
+    overallReliability: number;
+    previousPeriod: number;
+    totalFlightHours: number;
+    totalFlights: number;
+    incidents: number;
+    avgIncidentsPer100Hours: number;
+    mtbf: number;
+    mttr: number;
+  };
+  componentReliability: {
+    id: string;
+    component: string;
+    partNumber: string;
+    category: string;
+    totalInstalled: number;
+    failures: number;
+    mtbf: number;
+    availability: number;
+    trend: string;
+    change: number;
+    topFailureModes: { mode: string; count: number; percentage: number }[];
+  }[];
+  systemReliability: {
+    system: string;
+    reliability: number;
+    incidents: number;
+    trend: string;
+  }[];
+  incidentsByMonth: {
+    month: string;
+    incidents: number;
+    flights: number;
+  }[];
+  topFailureCauses: {
+    cause: string;
+    count: number;
+    percentage: number;
+  }[];
+}
+
+/**
  * Stats API service
  */
 export const statsService = {
@@ -69,6 +149,31 @@ export const statsService = {
   getDueMaintenanceItems(limit?: number): Promise<DueMaintenanceItem[]> {
     return api.get<DueMaintenanceItem[]>("/stats/due-maintenance", {
       params: { limit },
+    });
+  },
+
+  /**
+   * Get fault heatmap data for visualization
+   */
+  getFaultHeatmap(days?: number): Promise<FaultHeatmapData> {
+    return api.get<FaultHeatmapData>("/stats/fault-heatmap", {
+      params: { days },
+    });
+  },
+
+  /**
+   * Get fleet locations for map view
+   */
+  getFleetLocations(): Promise<FleetLocationsData> {
+    return api.get<FleetLocationsData>("/stats/fleet-locations");
+  },
+
+  /**
+   * Get reliability analysis data
+   */
+  getReliabilityData(days?: number): Promise<ReliabilityData> {
+    return api.get<ReliabilityData>("/stats/reliability", {
+      params: { days },
     });
   },
 };

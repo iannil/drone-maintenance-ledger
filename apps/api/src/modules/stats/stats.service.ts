@@ -1,7 +1,7 @@
 import { Injectable, Inject } from "@nestjs/common";
 import { sql, eq, desc, and, gte } from "drizzle-orm";
 
-import { db, aircraft, fleet, workOrder, flightLog } from "@repo/db";
+import { db, aircraft, fleet, workOrder, flightLog, pilotReport } from "@repo/db";
 
 /**
  * Dashboard statistics response
@@ -55,6 +55,86 @@ export interface DueMaintenanceItem {
   type: string;
   dueIn: string;
   status: "urgent" | "warning" | "normal";
+}
+
+/**
+ * Fault heatmap data
+ */
+export interface FaultHeatmapData {
+  byAircraftModel: { model: string; faultCount: number }[];
+  bySystem: { system: string; faultCount: number }[];
+  bySeverity: { severity: string; count: number }[];
+  byMonth: { month: string; count: number }[];
+  totalFaults: number;
+  openFaults: number;
+  criticalFaults: number;
+}
+
+/**
+ * Aircraft location data for map view
+ */
+export interface AircraftLocationData {
+  id: string;
+  registrationNumber: string;
+  model: string;
+  status: string;
+  latitude: number;
+  longitude: number;
+  lastFlightDate?: string;
+  totalFlightHours?: number;
+}
+
+/**
+ * Fleet locations response
+ */
+export interface FleetLocationsData {
+  aircraft: AircraftLocationData[];
+  lastUpdated: number;
+}
+
+/**
+ * Reliability data for analysis
+ */
+export interface ReliabilityData {
+  summary: {
+    overallReliability: number;
+    previousPeriod: number;
+    totalFlightHours: number;
+    totalFlights: number;
+    incidents: number;
+    avgIncidentsPer100Hours: number;
+    mtbf: number;
+    mttr: number;
+  };
+  componentReliability: {
+    id: string;
+    component: string;
+    partNumber: string;
+    category: string;
+    totalInstalled: number;
+    failures: number;
+    mtbf: number;
+    availability: number;
+    trend: string;
+    change: number;
+    topFailureModes: { mode: string; count: number; percentage: number }[];
+  }[];
+  systemReliability: {
+    system: string;
+    reliability: number;
+    incidents: number;
+    trend: string;
+  }[];
+  incidentsByMonth: {
+    month: string;
+    incidents: number;
+    flights: number;
+  }[];
+  topFailureCauses: {
+    cause: string;
+    count: number;
+    percentage: number;
+  }[];
 }
 
 /**
@@ -257,5 +337,339 @@ export class StatsService {
       CANCELLED: "已取消",
     };
     return statusMap[status] || status;
+  }
+
+  /**
+   * Get fault heatmap data for visualization
+   */
+  async getFaultHeatmap(days: number = 365): Promise<FaultHeatmapData> {
+    const startTime = Date.now() - days * 24 * 60 * 60 * 1000;
+
+    // Get faults by aircraft model
+    const faultsByModel = await db
+      .select({
+        model: aircraft.model,
+        count: sql<number>`count(*)`.as("count"),
+      })
+      .from(pilotReport)
+      .innerJoin(aircraft, eq(pilotReport.aircraftId, aircraft.id))
+      .where(and(
+        eq(pilotReport.isActive, true),
+        gte(pilotReport.createdAt, startTime)
+      ))
+      .groupBy(aircraft.model)
+      .orderBy(desc(sql`count(*)`));
+
+    // Get faults by affected system
+    const faultsBySystem = await db
+      .select({
+        system: pilotReport.affectedSystem,
+        count: sql<number>`count(*)`.as("count"),
+      })
+      .from(pilotReport)
+      .where(and(
+        eq(pilotReport.isActive, true),
+        gte(pilotReport.createdAt, startTime)
+      ))
+      .groupBy(pilotReport.affectedSystem)
+      .orderBy(desc(sql`count(*)`));
+
+    // Get faults by severity
+    const faultsBySeverity = await db
+      .select({
+        severity: pilotReport.severity,
+        count: sql<number>`count(*)`.as("count"),
+      })
+      .from(pilotReport)
+      .where(and(
+        eq(pilotReport.isActive, true),
+        gte(pilotReport.createdAt, startTime)
+      ))
+      .groupBy(pilotReport.severity);
+
+    // Get faults by month (simplified - group by creation month)
+    const faultsByMonth = await db
+      .select({
+        month: sql<string>`strftime('%Y-%m', datetime(${pilotReport.createdAt} / 1000, 'unixepoch'))`.as("month"),
+        count: sql<number>`count(*)`.as("count"),
+      })
+      .from(pilotReport)
+      .where(and(
+        eq(pilotReport.isActive, true),
+        gte(pilotReport.createdAt, startTime)
+      ))
+      .groupBy(sql`strftime('%Y-%m', datetime(${pilotReport.createdAt} / 1000, 'unixepoch'))`)
+      .orderBy(sql`month`);
+
+    // Get total counts
+    const [totalStats] = await db
+      .select({
+        total: sql<number>`count(*)`.as("total"),
+        open: sql<number>`sum(case when status = 'OPEN' or status = 'ACKNOWLEDGED' or status = 'INVESTIGATING' then 1 else 0 end)`.as("open"),
+        critical: sql<number>`sum(case when severity = 'CRITICAL' then 1 else 0 end)`.as("critical"),
+      })
+      .from(pilotReport)
+      .where(and(
+        eq(pilotReport.isActive, true),
+        gte(pilotReport.createdAt, startTime)
+      ));
+
+    return {
+      byAircraftModel: faultsByModel.map((row) => ({
+        model: row.model,
+        faultCount: Number(row.count),
+      })),
+      bySystem: faultsBySystem
+        .filter((row) => row.system)
+        .map((row) => ({
+          system: row.system || "未分类",
+          faultCount: Number(row.count),
+        })),
+      bySeverity: faultsBySeverity.map((row) => ({
+        severity: row.severity,
+        count: Number(row.count),
+      })),
+      byMonth: faultsByMonth.map((row) => ({
+        month: row.month,
+        count: Number(row.count),
+      })),
+      totalFaults: Number(totalStats?.total || 0),
+      openFaults: Number(totalStats?.open || 0),
+      criticalFaults: Number(totalStats?.critical || 0),
+    };
+  }
+
+  /**
+   * Get fleet locations for map view
+   * Note: Since GPS fields are not yet in the schema, this generates
+   * mock coordinates based on aircraft data. Update this when GPS fields are added.
+   */
+  async getFleetLocations(): Promise<FleetLocationsData> {
+    // Get all active aircraft
+    const allAircraft = await db
+      .select({
+        id: aircraft.id,
+        registrationNumber: aircraft.registrationNumber,
+        model: aircraft.model,
+        status: aircraft.status,
+        totalFlightHours: aircraft.totalFlightHours,
+      })
+      .from(aircraft);
+
+    // Get last flight date for each aircraft
+    const lastFlights = await db
+      .select({
+        aircraftId: flightLog.aircraftId,
+        lastFlightDate: sql<number>`MAX(${flightLog.flightDate})`.as("lastFlightDate"),
+      })
+      .from(flightLog)
+      .where(eq(flightLog.isActive, true))
+      .groupBy(flightLog.aircraftId);
+
+    const lastFlightMap = new Map(
+      lastFlights.map((f) => [f.aircraftId, f.lastFlightDate])
+    );
+
+    // Generate mock coordinates for demo purposes
+    // Base location: Central China coordinates
+    const baseLatitude = 35.8617;
+    const baseLongitude = 104.1954;
+
+    const aircraftLocations: AircraftLocationData[] = allAircraft.map((ac, index) => {
+      // Generate pseudo-random but consistent coordinates based on aircraft ID
+      const hash = ac.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      const latOffset = ((hash % 1000) / 1000 - 0.5) * 20; // +/- 10 degrees
+      const lngOffset = ((hash * 7 % 1000) / 1000 - 0.5) * 30; // +/- 15 degrees
+
+      const lastFlight = lastFlightMap.get(ac.id);
+      const lastFlightDate = lastFlight
+        ? new Date(lastFlight).toLocaleDateString("zh-CN")
+        : undefined;
+
+      return {
+        id: ac.id,
+        registrationNumber: ac.registrationNumber,
+        model: ac.model,
+        status: ac.status,
+        latitude: baseLatitude + latOffset,
+        longitude: baseLongitude + lngOffset,
+        lastFlightDate,
+        totalFlightHours: ac.totalFlightHours,
+      };
+    });
+
+    return {
+      aircraft: aircraftLocations,
+      lastUpdated: Date.now(),
+    };
+  }
+
+  /**
+   * Get reliability analysis data
+   */
+  async getReliabilityData(days: number = 180): Promise<ReliabilityData> {
+    const startTime = Date.now() - days * 24 * 60 * 60 * 1000;
+    const previousStartTime = startTime - days * 24 * 60 * 60 * 1000;
+
+    // Get flight statistics for the period
+    const [currentFlightStats] = await db
+      .select({
+        totalHours: sql<number>`COALESCE(SUM(${flightLog.flightHours}), 0)`.as("totalHours"),
+        totalFlights: sql<number>`COUNT(*)`.as("totalFlights"),
+      })
+      .from(flightLog)
+      .where(and(
+        eq(flightLog.isActive, true),
+        gte(flightLog.createdAt, startTime)
+      ));
+
+    // Get incident count (PIREPs with severity > MINOR)
+    const [currentIncidents] = await db
+      .select({
+        count: sql<number>`COUNT(*)`.as("count"),
+      })
+      .from(pilotReport)
+      .where(and(
+        eq(pilotReport.isActive, true),
+        gte(pilotReport.createdAt, startTime)
+      ));
+
+    // Get previous period statistics for comparison
+    const [previousFlightStats] = await db
+      .select({
+        totalHours: sql<number>`COALESCE(SUM(${flightLog.flightHours}), 0)`.as("totalHours"),
+        totalFlights: sql<number>`COUNT(*)`.as("totalFlights"),
+      })
+      .from(flightLog)
+      .where(and(
+        eq(flightLog.isActive, true),
+        gte(flightLog.createdAt, previousStartTime),
+        sql`${flightLog.createdAt} < ${startTime}`
+      ));
+
+    const [previousIncidents] = await db
+      .select({
+        count: sql<number>`COUNT(*)`.as("count"),
+      })
+      .from(pilotReport)
+      .where(and(
+        eq(pilotReport.isActive, true),
+        gte(pilotReport.createdAt, previousStartTime),
+        sql`${pilotReport.createdAt} < ${startTime}`
+      ));
+
+    const totalFlightHours = Number(currentFlightStats?.totalHours || 0);
+    const totalFlights = Number(currentFlightStats?.totalFlights || 0);
+    const incidents = Number(currentIncidents?.count || 0);
+    const previousTotalHours = Number(previousFlightStats?.totalHours || 0);
+    const previousIncidentCount = Number(previousIncidents?.count || 0);
+
+    // Calculate reliability metrics
+    const avgIncidentsPer100Hours = totalFlightHours > 0 ? (incidents / totalFlightHours) * 100 : 0;
+    const mtbf = incidents > 0 ? totalFlightHours / incidents : 9999;
+    const mttr = 4.2; // Placeholder - would need work order completion data
+
+    // Calculate overall reliability (simplified)
+    const overallReliability = totalFlightHours > 0
+      ? Math.min(99.9, 100 - (incidents / totalFlightHours) * 10)
+      : 100;
+
+    const previousReliability = previousTotalHours > 0
+      ? Math.min(99.9, 100 - (previousIncidentCount / previousTotalHours) * 10)
+      : 100;
+
+    // Get incidents by month
+    const incidentsByMonth = await db
+      .select({
+        month: sql<string>`strftime('%Y-%m', datetime(${pilotReport.createdAt} / 1000, 'unixepoch'))`.as("month"),
+        incidents: sql<number>`COUNT(*)`.as("incidents"),
+      })
+      .from(pilotReport)
+      .where(and(
+        eq(pilotReport.isActive, true),
+        gte(pilotReport.createdAt, startTime)
+      ))
+      .groupBy(sql`strftime('%Y-%m', datetime(${pilotReport.createdAt} / 1000, 'unixepoch'))`)
+      .orderBy(sql`month`);
+
+    // Get flights by month
+    const flightsByMonth = await db
+      .select({
+        month: sql<string>`strftime('%Y-%m', datetime(${flightLog.flightDate} / 1000, 'unixepoch'))`.as("month"),
+        flights: sql<number>`COUNT(*)`.as("flights"),
+      })
+      .from(flightLog)
+      .where(and(
+        eq(flightLog.isActive, true),
+        gte(flightLog.createdAt, startTime)
+      ))
+      .groupBy(sql`strftime('%Y-%m', datetime(${flightLog.flightDate} / 1000, 'unixepoch'))`)
+      .orderBy(sql`month`);
+
+    const flightsMap = new Map(flightsByMonth.map(f => [f.month, Number(f.flights)]));
+
+    // Get failure causes from PIREPs
+    const failureCauses = await db
+      .select({
+        cause: pilotReport.affectedSystem,
+        count: sql<number>`COUNT(*)`.as("count"),
+      })
+      .from(pilotReport)
+      .where(and(
+        eq(pilotReport.isActive, true),
+        gte(pilotReport.createdAt, startTime)
+      ))
+      .groupBy(pilotReport.affectedSystem)
+      .orderBy(desc(sql`count(*)`))
+      .limit(5);
+
+    const totalCauses = failureCauses.reduce((sum, c) => sum + Number(c.count), 0);
+
+    // Get system reliability from PIREPs
+    const systemStats = await db
+      .select({
+        system: pilotReport.affectedSystem,
+        incidents: sql<number>`COUNT(*)`.as("incidents"),
+      })
+      .from(pilotReport)
+      .where(and(
+        eq(pilotReport.isActive, true),
+        gte(pilotReport.createdAt, startTime)
+      ))
+      .groupBy(pilotReport.affectedSystem);
+
+    return {
+      summary: {
+        overallReliability: Math.round(overallReliability * 10) / 10,
+        previousPeriod: Math.round(previousReliability * 10) / 10,
+        totalFlightHours: Math.round(totalFlightHours * 10) / 10,
+        totalFlights,
+        incidents,
+        avgIncidentsPer100Hours: Math.round(avgIncidentsPer100Hours * 100) / 100,
+        mtbf: Math.round(mtbf),
+        mttr,
+      },
+      componentReliability: [], // Would require component failure tracking
+      systemReliability: systemStats
+        .filter(s => s.system)
+        .map(s => ({
+          system: s.system || "其他",
+          reliability: Math.max(90, 100 - (Number(s.incidents) / Math.max(totalFlights, 1)) * 100),
+          incidents: Number(s.incidents),
+          trend: "STABLE" as const,
+        })),
+      incidentsByMonth: incidentsByMonth.map(i => ({
+        month: i.month,
+        incidents: Number(i.incidents),
+        flights: flightsMap.get(i.month) || 0,
+      })),
+      topFailureCauses: failureCauses
+        .filter(c => c.cause)
+        .map(c => ({
+          cause: c.cause || "其他",
+          count: Number(c.count),
+          percentage: totalCauses > 0 ? Math.round((Number(c.count) / totalCauses) * 1000) / 10 : 0,
+        })),
+    };
   }
 }

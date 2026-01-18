@@ -3,7 +3,7 @@
  * 零部件BOM页面
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ChevronDown,
@@ -20,307 +20,8 @@ import {
   Download,
   Printer,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
-
-// Mock data for aircraft BOM
-const MOCK_AIRCRAFT_BOM = {
-  id: "BOM-AC-001",
-  aircraftId: "AC-2024-0015",
-  aircraft: {
-    registration: "B-702A",
-    model: "DJI Matrice 350 RTK",
-    serialNumber: "SN-M350-0015",
-  },
-  version: "v2.3",
-  lastUpdated: "2025-01-10T14:30:00",
-  tree: [
-    {
-      id: "assy-001",
-      partNumber: "ASSY-M350-MAIN",
-      name: "主机身总成",
-      quantity: 1,
-      unit: "套",
-      category: "结构",
-      level: 1,
-      isExpandable: true,
-      isExpanded: true,
-      children: [
-        {
-          id: "part-001",
-          partNumber: "BODY-M350-01",
-          name: "机身框架",
-          quantity: 1,
-          unit: "件",
-          category: "结构",
-          level: 2,
-          isExpandable: false,
-          installedSn: "SN-BODY-015",
-          installedDate: "2024-03-15",
-          status: "INSTALLED",
-        },
-        {
-          id: "part-002",
-          partNumber: "COVER-M350-TOP",
-          name: "上壳盖",
-          quantity: 1,
-          unit: "件",
-          category: "结构",
-          level: 2,
-          isExpandable: false,
-          installedSn: "SN-COV-015",
-          installedDate: "2024-03-15",
-          status: "INSTALLED",
-        },
-        {
-          id: "assy-002",
-          partNumber: "ASSY-M350-ARM",
-          name: "机臂总成",
-          quantity: 4,
-          unit: "套",
-          category: "结构",
-          level: 2,
-          isExpandable: true,
-          isExpanded: false,
-          children: [
-            {
-              id: "part-003",
-              partNumber: "ARM-M350-01",
-              name: "机臂折叠组件",
-              quantity: 1,
-              unit: "件",
-              category: "结构",
-              level: 3,
-              isExpandable: false,
-              installedSn: "SN-ARM-060",
-              installedDate: "2024-03-15",
-              status: "INSTALLED",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: "assy-003",
-      partNumber: "ASSY-M350-POWER",
-      name: "动力系统",
-      quantity: 1,
-      unit: "套",
-      category: "动力",
-      level: 1,
-      isExpandable: true,
-      isExpanded: true,
-      children: [
-        {
-          id: "assy-004",
-          partNumber: "ASSY-M350-MOTOR",
-          name: "电机总成",
-          quantity: 4,
-          unit: "套",
-          category: "动力",
-          level: 2,
-          isExpandable: true,
-          isExpanded: false,
-          children: [
-            {
-              id: "part-004",
-              partNumber: "MOTOR-M350-01",
-              name: "无刷电机 M350",
-              quantity: 1,
-              unit: "台",
-              category: "动力",
-              level: 3,
-              isExpandable: false,
-              installedSn: "SN-MOT-042",
-              installedDate: "2024-03-15",
-              status: "INSTALLED",
-              isLlp: true,
-              lifeLimit: 1000,
-              lifeUnit: "飞行小时",
-              currentUsage: 342,
-            },
-            {
-              id: "part-005",
-              partNumber: "ESC-M350-01",
-              name: "电调 M350",
-              quantity: 1,
-              unit: "台",
-              category: "动力",
-              level: 3,
-              isExpandable: false,
-              installedSn: "SN-ESC-042",
-              installedDate: "2024-03-15",
-              status: "INSTALLED",
-            },
-          ],
-        },
-        {
-          id: "assy-005",
-          partNumber: "ASSY-M350-PROP",
-          name: "螺旋桨总成",
-          quantity: 4,
-          unit: "套",
-          category: "动力",
-          level: 2,
-          isExpandable: true,
-          isExpanded: false,
-          children: [
-            {
-              id: "part-006",
-              partNumber: "PROP-M350-01",
-              name: "桨叶 M350",
-              quantity: 2,
-              unit: "片",
-              category: "动力",
-              level: 3,
-              isExpandable: false,
-              installedSn: "SN-PROP-156",
-              installedDate: "2024-12-20",
-              status: "INSTALLED",
-              isLlp: true,
-              lifeLimit: 500,
-              lifeUnit: "飞行小时",
-              currentUsage: 89,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: "assy-006",
-      partNumber: "ASSY-M350-BATT",
-      name: "电池系统",
-      quantity: 1,
-      unit: "套",
-      category: "电源",
-      level: 1,
-      isExpandable: true,
-      isExpanded: false,
-      children: [
-        {
-          id: "part-007",
-          partNumber: "BATT-M350-01",
-          name: "智能电池箱 M350",
-          quantity: 1,
-          unit: "件",
-          category: "电源",
-          level: 2,
-          isExpandable: false,
-          installedSn: "SN-BATT-BOX-015",
-          installedDate: "2024-03-15",
-          status: "INSTALLED",
-        },
-        {
-          id: "part-008",
-          partNumber: "BATT-M350-CELL",
-          name: "电池组 M350",
-          quantity: 2,
-          unit: "块",
-          category: "电源",
-          level: 2,
-          isExpandable: false,
-          installedSn: "SN-BATT-089, SN-BATT-090",
-          installedDate: "2024-12-01",
-          status: "INSTALLED",
-          isLlp: true,
-          lifeLimit: 300,
-          lifeUnit: "循环次数",
-          currentUsage: 45,
-        },
-      ],
-    },
-    {
-      id: "assy-007",
-      partNumber: "ASSY-M350-AVIONICS",
-      name: "航电系统",
-      quantity: 1,
-      unit: "套",
-      category: "航电",
-      level: 1,
-      isExpandable: true,
-      isExpanded: false,
-      children: [
-        {
-          id: "part-009",
-          partNumber: "FC-M350-01",
-          name: "飞控单元",
-          quantity: 1,
-          unit: "件",
-          category: "航电",
-          level: 2,
-          isExpandable: false,
-          installedSn: "SN-FC-015",
-          installedDate: "2024-03-15",
-          status: "INSTALLED",
-        },
-        {
-          id: "part-010",
-          partNumber: "GPS-M350-01",
-          name: "GPS模块",
-          quantity: 1,
-          unit: "件",
-          category: "航电",
-          level: 2,
-          isExpandable: false,
-          installedSn: "SN-GPS-015",
-          installedDate: "2024-03-15",
-          status: "INSTALLED",
-        },
-        {
-          id: "part-011",
-          partNumber: "RC-M350-01",
-          name: "遥控接收模块",
-          quantity: 1,
-          unit: "件",
-          category: "航电",
-          level: 2,
-          isExpandable: false,
-          installedSn: "SN-RC-015",
-          installedDate: "2024-03-15",
-          status: "INSTALLED",
-        },
-      ],
-    },
-    {
-      id: "assy-008",
-      partNumber: "ASSY-M350-GIMBAL",
-      name: "云台相机系统",
-      quantity: 1,
-      unit: "套",
-      category: "任务载荷",
-      level: 1,
-      isExpandable: true,
-      isExpanded: false,
-      children: [
-        {
-          id: "part-012",
-          partNumber: "GIMBAL-Z30",
-          name: "云台 Z30",
-          quantity: 1,
-          unit: "件",
-          category: "任务载荷",
-          level: 2,
-          isExpandable: false,
-          installedSn: "SN-GIM-008",
-          installedDate: "2024-05-20",
-          status: "INSTALLED",
-        },
-        {
-          id: "part-013",
-          partNumber: "CAM-Z30",
-          name: "相机模组 Z30",
-          quantity: 1,
-          unit: "件",
-          category: "任务载荷",
-          level: 2,
-          isExpandable: false,
-          installedSn: "SN-CAM-008",
-          installedDate: "2024-05-20",
-          status: "INSTALLED",
-        },
-      ],
-    },
-  ],
-};
 
 const STATUS_CONFIG = {
   INSTALLED: { label: "已安装", color: "bg-green-100 text-green-700" },
@@ -358,14 +59,51 @@ interface BOMNode {
   currentUsage?: number;
 }
 
+interface BOMData {
+  id: string;
+  aircraftId: string;
+  aircraft: {
+    registration: string;
+    model: string;
+    serialNumber: string;
+  };
+  version: string;
+  lastUpdated: string;
+  tree: BOMNode[];
+}
+
 export function ComponentBomPage() {
   const { aircraftId } = useParams<{ aircraftId: string }>();
-  const [bomData, setBomData] = useState<{ id: string; aircraftId: string; aircraft: { registration: string; model: string; serialNumber: string }; version: string; lastUpdated: string; tree: BOMNode[] }>(MOCK_AIRCRAFT_BOM as any);
+  const [bomData, setBomData] = useState<BOMData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [showLlpOnly, setShowLlpOnly] = useState(false);
 
+  useEffect(() => {
+    // TODO: Replace with actual API call
+    // Example: const response = await bomService.getAircraftBom(aircraftId);
+    const loadBomData = async () => {
+      setLoading(true);
+      try {
+        // Simulate API delay
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        // TODO: Fetch actual BOM data from API
+        // setBomData(response.data);
+        setBomData(null);
+      } catch (error) {
+        console.error("Failed to load BOM data:", error);
+        setBomData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadBomData();
+  }, [aircraftId]);
+
   const toggleNode = (nodeId: string) => {
+    if (!bomData) return;
     const toggleNodeRecursive = (nodes: BOMNode[]): BOMNode[] => {
       return nodes.map((node) => {
         if (node.id === nodeId) {
@@ -384,6 +122,7 @@ export function ComponentBomPage() {
   };
 
   const expandAll = () => {
+    if (!bomData) return;
     const expandAllRecursive = (nodes: BOMNode[]): BOMNode[] => {
       return nodes.map((node) => ({
         ...node,
@@ -398,6 +137,7 @@ export function ComponentBomPage() {
   };
 
   const collapseAll = () => {
+    if (!bomData) return;
     const collapseAllRecursive = (nodes: BOMNode[]): BOMNode[] => {
       return nodes.map((node) => ({
         ...node,
@@ -427,7 +167,7 @@ export function ComponentBomPage() {
     return result;
   };
 
-  const visibleNodes = flattenVisibleNodes(bomData.tree).filter((node) => {
+  const visibleNodes = bomData ? flattenVisibleNodes(bomData.tree).filter((node) => {
     const matchesSearch =
       searchQuery === "" ||
       node.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -435,7 +175,7 @@ export function ComponentBomPage() {
     const matchesCategory = selectedCategory === "ALL" || node.category === selectedCategory;
     const matchesLlp = !showLlpOnly || node.isLlp;
     return matchesSearch && matchesCategory && matchesLlp;
-  });
+  }) : [];
 
   const handleExport = () => {
     console.log("Exporting BOM");
@@ -453,7 +193,52 @@ export function ComponentBomPage() {
     return { color: "text-green-600", label: "正常" };
   };
 
-  const categories = Array.from(new Set(flattenVisibleNodes(bomData.tree).map((n) => n.category)));
+  const categories = bomData ? Array.from(new Set(flattenVisibleNodes(bomData.tree).map((n) => n.category))) : [];
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <p className="text-slate-500">加载BOM数据中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (!bomData || bomData.tree.length === 0) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">零部件BOM</h1>
+            <p className="text-slate-500 mt-1">飞机ID: {aircraftId || "-"}</p>
+          </div>
+        </div>
+
+        {/* Empty State Card */}
+        <div className="bg-white rounded-xl border border-slate-200 p-12">
+          <div className="flex flex-col items-center justify-center text-center">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+              <Box className="w-8 h-8 text-slate-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">暂无BOM数据</h3>
+            <p className="text-slate-500 mb-6">暂无BOM数据，请配置飞机的零部件结构</p>
+            <Link
+              to={`/aircraft/${aircraftId}/bom/configure`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              配置BOM结构
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

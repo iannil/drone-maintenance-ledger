@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   Plus,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -35,33 +36,17 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Textarea } from "../components/ui/textarea";
+import { fullAircraftService, type Aircraft } from "../services/fleet.service";
+import { userService, type User as UserType } from "../services/user.service";
+import { flightLogService, type FlightType, FLIGHT_TYPE_LABELS } from "../services/flight-log.service";
 
-// 飞行类型选项
-const FLIGHT_TYPES = [
-  { value: "INSPECTION", label: "巡检", description: "电力巡检、管道巡检等" },
+// 飞行类型选项 (匹配后端枚举)
+const FLIGHT_TYPES: { value: FlightType; label: string; description: string }[] = [
+  { value: "OPERATION", label: "运营", description: "正常运营飞行" },
   { value: "DELIVERY", label: "配送", description: "物流配送、物资运输" },
-  { value: "SURVEY", label: "测绘", description: "地形测绘、三维建模" },
   { value: "TRAINING", label: "训练", description: "飞行员培训、练习" },
   { value: "TEST", label: "测试", description: "设备测试、功能验证" },
-  { value: "EMERGENCY", label: "应急", description: "紧急救援、应急响应" },
-  { value: "OTHER", label: "其他", description: "其他任务类型" },
-];
-
-// Mock 飞机数据
-const MOCK_AIRCRAFT = [
-  { id: "ac-001", registration: "B-7011U", model: "DJI M350 RTK", status: "SERVICEABLE" },
-  { id: "ac-002", registration: "B-7012U", model: "DJI M350 RTK", status: "SERVICEABLE" },
-  { id: "ac-003", registration: "B-7013U", model: "DJI M300 RTK", status: "MAINTENANCE" },
-  { id: "ac-004", registration: "B-7021U", model: "DJI M30", status: "SERVICEABLE" },
-  { id: "ac-005", registration: "B-7022U", model: "DJI M30", status: "GROUNDED" },
-];
-
-// Mock 飞行员数据
-const MOCK_PILOTS = [
-  { id: "user-001", name: "张三", role: "PILOT" },
-  { id: "user-002", name: "李四", role: "PILOT" },
-  { id: "user-003", name: "王五", role: "PILOT" },
-  { id: "user-004", name: "赵六", role: "PILOT" },
+  { value: "FERRY", label: "转场", description: "飞机转场飞行" },
 ];
 
 // 常用地点
@@ -84,7 +69,7 @@ interface FlightLogFormData {
   landingTime: string;
   takeoffLocation: string;
   landingLocation: string;
-  flightType: string;
+  flightType: FlightType;
   flightHours: number;
   flightCycles: number;
   missionDescription: string;
@@ -100,6 +85,12 @@ export function FlightLogFormPage() {
   const navigate = useNavigate();
   const isEditing = !!id;
 
+  // API 数据状态
+  const [aircraft, setAircraft] = useState<Aircraft[]>([]);
+  const [pilots, setPilots] = useState<UserType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   // 表单状态
   const [formData, setFormData] = useState<FlightLogFormData>({
     aircraftId: "",
@@ -110,7 +101,7 @@ export function FlightLogFormPage() {
     landingTime: "",
     takeoffLocation: "",
     landingLocation: "",
-    flightType: "INSPECTION",
+    flightType: "OPERATION",
     flightHours: 0,
     flightCycles: 1,
     missionDescription: "",
@@ -121,7 +112,65 @@ export function FlightLogFormPage() {
   // UI 状态
   const [isDirty, setIsDirty] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [showPirepHint, setShowPirepHint] = useState(false);
+
+  // 加载飞机和飞行员数据
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const [aircraftData, pilotsData] = await Promise.all([
+          fullAircraftService.list(100),
+          userService.getPilots(100),
+        ]);
+        setAircraft(aircraftData);
+        setPilots(pilotsData);
+      } catch (err) {
+        console.error("Failed to load data:", err);
+        setLoadError("加载数据失败，请刷新页面重试");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  // 加载编辑数据
+  useEffect(() => {
+    if (isEditing && id) {
+      const loadFlightLog = async () => {
+        try {
+          const flightLog = await flightLogService.getById(id);
+          const flightDate = new Date(flightLog.flightDate);
+          const departureTime = flightLog.departureTime ? new Date(flightLog.departureTime) : null;
+          const arrivalTime = flightLog.arrivalTime ? new Date(flightLog.arrivalTime) : null;
+
+          setFormData({
+            aircraftId: flightLog.aircraftId,
+            pilotId: flightLog.pilotId,
+            copilotId: flightLog.copilotId || "",
+            flightDate: flightDate.toISOString().split("T")[0],
+            takeoffTime: departureTime ? departureTime.toTimeString().slice(0, 5) : "",
+            landingTime: arrivalTime ? arrivalTime.toTimeString().slice(0, 5) : "",
+            takeoffLocation: flightLog.departureLocation,
+            landingLocation: flightLog.arrivalLocation || "",
+            flightType: flightLog.flightType,
+            flightHours: flightLog.flightHours,
+            flightCycles: flightLog.landingCycles,
+            missionDescription: flightLog.missionDescription || "",
+            remarks: flightLog.postFlightNotes || "",
+            attachments: [],
+          });
+        } catch (err) {
+          console.error("Failed to load flight log:", err);
+          setLoadError("加载飞行记录失败");
+        }
+      };
+      loadFlightLog();
+    }
+  }, [isEditing, id]);
 
   // 计算飞行小时
   useEffect(() => {
@@ -141,7 +190,18 @@ export function FlightLogFormPage() {
   }, [formData.takeoffTime, formData.landingTime, formData.flightDate]);
 
   // 获取选中的飞机
-  const selectedAircraft = MOCK_AIRCRAFT.find((a) => a.id === formData.aircraftId);
+  const selectedAircraft = aircraft.find((a) => a.id === formData.aircraftId);
+
+  // 转换飞机状态用于显示
+  const getAircraftDisplayStatus = (status: string) => {
+    switch (status) {
+      case "AVAILABLE": return "SERVICEABLE";
+      case "IN_MAINTENANCE": return "MAINTENANCE";
+      case "AOG": return "GROUNDED";
+      case "RETIRED": return "RETIRED";
+      default: return status;
+    }
+  };
 
   // 处理输入变化
   const handleInputChange = (
@@ -194,24 +254,61 @@ export function FlightLogFormPage() {
     }
 
     setIsSubmitting(true);
+    setSubmitError(null);
 
-    // 模拟 API 调用
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      // 构建 API 请求数据
+      const flightDate = new Date(formData.flightDate);
+      const takeoffDateTime = new Date(`${formData.flightDate}T${formData.takeoffTime}`);
+      const landingDateTime = new Date(`${formData.flightDate}T${formData.landingTime}`);
+      // 处理跨天情况
+      if (landingDateTime < takeoffDateTime) {
+        landingDateTime.setDate(landingDateTime.getDate() + 1);
+      }
 
-    console.log("提交飞行记录:", formData);
+      const dto = {
+        aircraftId: formData.aircraftId,
+        pilotId: formData.pilotId,
+        copilotId: formData.copilotId && formData.copilotId !== "none" ? formData.copilotId : undefined,
+        flightDate: flightDate.getTime(),
+        flightType: formData.flightType,
+        departureLocation: formData.takeoffLocation,
+        departureTime: takeoffDateTime.getTime(),
+        arrivalLocation: formData.landingLocation,
+        arrivalTime: landingDateTime.getTime(),
+        flightDuration: Math.round(formData.flightHours * 60),
+        flightHours: formData.flightHours,
+        takeoffCycles: formData.flightCycles,
+        landingCycles: formData.flightCycles,
+        missionDescription: formData.missionDescription || undefined,
+        postFlightNotes: formData.remarks || undefined,
+      };
 
-    if (submitPirep) {
-      // 跳转到 PIREP 创建页面
-      navigate("/pireps/new", {
-        state: { flightLogId: "new", aircraftId: formData.aircraftId },
-      });
-    } else {
-      // 跳转到详情页
-      navigate("/flight-logs");
+      let createdId: string;
+      if (isEditing && id) {
+        await flightLogService.update(id, dto);
+        createdId = id;
+      } else {
+        const result = await flightLogService.create(dto);
+        createdId = result.id;
+      }
+
+      if (submitPirep) {
+        // 跳转到 PIREP 创建页面
+        navigate("/pireps/new", {
+          state: { flightLogId: createdId, aircraftId: formData.aircraftId },
+        });
+      } else {
+        // 跳转到详情页
+        navigate("/flight-logs");
+      }
+    } catch (err) {
+      console.error("Submit error:", err);
+      setSubmitError(err instanceof Error ? err.message : "提交失败，请重试");
+    } finally {
+      setIsSubmitting(false);
+      setIsDirty(false);
     }
-
-    setIsSubmitting(false);
-    setIsDirty(false);
   };
 
   // 取消/返回
@@ -228,12 +325,40 @@ export function FlightLogFormPage() {
   // 保存草稿
   const handleSaveDraft = async () => {
     setIsSubmitting(true);
-    // 模拟保存草稿
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    console.log("保存草稿:", formData);
-    setIsSubmitting(false);
-    setIsDirty(false);
-    alert("草稿已保存");
+    try {
+      // 构建 API 请求数据（草稿保存为正式记录）
+      const flightDate = new Date(formData.flightDate);
+      const dto = {
+        aircraftId: formData.aircraftId,
+        pilotId: formData.pilotId,
+        copilotId: formData.copilotId && formData.copilotId !== "none" ? formData.copilotId : undefined,
+        flightDate: flightDate.getTime(),
+        flightType: formData.flightType,
+        departureLocation: formData.takeoffLocation || "草稿",
+        departureTime: formData.takeoffTime ? new Date(`${formData.flightDate}T${formData.takeoffTime}`).getTime() : undefined,
+        arrivalLocation: formData.landingLocation || undefined,
+        arrivalTime: formData.landingTime ? new Date(`${formData.flightDate}T${formData.landingTime}`).getTime() : undefined,
+        flightDuration: Math.round(formData.flightHours * 60),
+        flightHours: formData.flightHours,
+        takeoffCycles: formData.flightCycles,
+        landingCycles: formData.flightCycles,
+        missionDescription: `[草稿] ${formData.missionDescription || ""}`,
+        postFlightNotes: formData.remarks || undefined,
+      };
+
+      if (isEditing && id) {
+        await flightLogService.update(id, dto);
+      } else {
+        await flightLogService.create(dto);
+      }
+      setIsDirty(false);
+      alert("草稿已保存");
+    } catch (err) {
+      console.error("Save draft error:", err);
+      alert("保存草稿失败，请重试");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -253,8 +378,50 @@ export function FlightLogFormPage() {
         </div>
       </div>
 
+      {/* Loading state */}
+      {isLoading && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
+              <span className="text-blue-800">加载数据中...</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Error state */}
+      {loadError && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-red-800">加载失败</p>
+                <p className="text-sm text-red-700">{loadError}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Submit error */}
+      {submitError && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-red-800">提交失败</p>
+                <p className="text-sm text-red-700">{submitError}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Alert for aircraft status */}
-      {selectedAircraft?.status !== "SERVICEABLE" && (
+      {selectedAircraft && selectedAircraft.status !== "AVAILABLE" && (
         <Card className="border-amber-200 bg-amber-50">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
@@ -263,9 +430,9 @@ export function FlightLogFormPage() {
                 <p className="font-medium text-amber-800">注意：飞机状态异常</p>
                 <p className="text-sm text-amber-700">
                   所选飞机当前状态为{" "}
-                  {selectedAircraft?.status === "MAINTENANCE" && "维护中"}
-                  {selectedAircraft?.status === "GROUNDED" && "已停飞"}
-                  {selectedAircraft?.status === "RETIRED" && "已退役"}
+                  {selectedAircraft.status === "IN_MAINTENANCE" && "维护中"}
+                  {selectedAircraft.status === "AOG" && "已停飞"}
+                  {selectedAircraft.status === "RETIRED" && "已退役"}
                   ，请确认是否可以执行飞行任务。
                 </p>
               </div>
@@ -297,27 +464,28 @@ export function FlightLogFormPage() {
                     <Select
                       value={formData.aircraftId}
                       onValueChange={(value) => handleInputChange("aircraftId", value)}
+                      disabled={isLoading}
                     >
                       <SelectTrigger id="aircraft">
                         <SelectValue placeholder="选择飞机" />
                       </SelectTrigger>
                       <SelectContent>
-                        {MOCK_AIRCRAFT.map((aircraft) => (
+                        {aircraft.map((ac) => (
                           <SelectItem
-                            key={aircraft.id}
-                            value={aircraft.id}
-                            disabled={aircraft.status !== "SERVICEABLE"}
+                            key={ac.id}
+                            value={ac.id}
+                            disabled={ac.status !== "AVAILABLE"}
                           >
                             <div className="flex items-center gap-2">
-                              <span>{aircraft.registration}</span>
+                              <span>{ac.registrationNumber}</span>
                               <span className="text-muted-foreground text-xs">
-                                {aircraft.model}
+                                {ac.model}
                               </span>
-                              {aircraft.status !== "SERVICEABLE" && (
+                              {ac.status !== "AVAILABLE" && (
                                 <Badge variant="outline" className="text-xs">
-                                  {aircraft.status === "MAINTENANCE" && "维护中"}
-                                  {aircraft.status === "GROUNDED" && "停飞"}
-                                  {aircraft.status === "RETIRED" && "退役"}
+                                  {ac.status === "IN_MAINTENANCE" && "维护中"}
+                                  {ac.status === "AOG" && "停飞"}
+                                  {ac.status === "RETIRED" && "退役"}
                                 </Badge>
                               )}
                             </div>
@@ -334,12 +502,13 @@ export function FlightLogFormPage() {
                     <Select
                       value={formData.pilotId}
                       onValueChange={(value) => handleInputChange("pilotId", value)}
+                      disabled={isLoading}
                     >
                       <SelectTrigger id="pilot">
                         <SelectValue placeholder="选择飞行员" />
                       </SelectTrigger>
                       <SelectContent>
-                        {MOCK_PILOTS.map((pilot) => (
+                        {pilots.map((pilot) => (
                           <SelectItem key={pilot.id} value={pilot.id}>
                             <div className="flex items-center gap-2">
                               <User className="h-4 w-4 text-muted-foreground" />
@@ -358,13 +527,14 @@ export function FlightLogFormPage() {
                   <Select
                     value={formData.copilotId}
                     onValueChange={(value) => handleInputChange("copilotId", value)}
+                    disabled={isLoading}
                   >
                     <SelectTrigger id="copilot">
                       <SelectValue placeholder="选择副驾驶" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">无副驾驶</SelectItem>
-                      {MOCK_PILOTS.filter((p) => p.id !== formData.pilotId).map((pilot) => (
+                      {pilots.filter((p) => p.id !== formData.pilotId).map((pilot) => (
                         <SelectItem key={pilot.id} value={pilot.id}>
                           {pilot.name}
                         </SelectItem>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   User,
   Bell,
@@ -15,6 +15,7 @@ import {
   Edit,
   Check,
   X,
+  Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -35,31 +36,12 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-
-// Mock user data
-const currentUser = {
-  id: "user-001",
-  username: "zhang.san",
-  fullName: "张三",
-  email: "zhang.san@example.com",
-  role: "MAINTENANCE_MANAGER",
-  phone: "+86 138****1234",
-  avatar: null,
-};
-
-// Mock users list
-const mockUsers = [
-  { id: "user-001", username: "zhang.san", fullName: "张三", role: "MAINTENANCE_MANAGER", status: "active" },
-  { id: "user-002", username: "li.si", fullName: "李四", role: "MECHANIC", status: "active" },
-  { id: "user-003", username: "wang.wu", fullName: "王五", role: "PILOT", status: "active" },
-  { id: "user-004", username: "zhao.liu", fullName: "赵六", role: "INSPECTOR", status: "active" },
-  { id: "user-005", username: "qian.qi", fullName: "钱七", role: "ADMIN", status: "inactive" },
-];
+import { userService, User as UserType, ROLE_LABELS } from "../services/user.service";
 
 // Role definitions
 const ROLES = {
   ADMIN: { label: "系统管理员", color: "bg-purple-100 text-purple-700", description: "完全访问权限" },
-  MAINTENANCE_MANAGER: { label: "维保经理", color: "bg-blue-100 text-blue-700", description: "维保计划、工单管理" },
+  MANAGER: { label: "维保经理", color: "bg-blue-100 text-blue-700", description: "维保计划、工单管理" },
   INSPECTOR: { label: "检验员", color: "bg-green-100 text-green-700", description: "工单审核、签字放行" },
   MECHANIC: { label: "维修工", color: "bg-yellow-100 text-yellow-700", description: "执行工单、领料" },
   PILOT: { label: "飞手", color: "bg-orange-100 text-orange-700", description: "飞行记录、故障报告" },
@@ -119,6 +101,33 @@ const componentTypes = [
 export function SettingsPage() {
   const [activeTab, setActiveTab] = useState("profile");
   const [saving, setSaving] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserType | null>(null);
+  const [users, setUsers] = useState<UserType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load current user and users list
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true);
+      try {
+        const profile = await userService.getProfile();
+        setCurrentUser(profile);
+
+        // Try to load users list
+        try {
+          const usersList = await userService.list({ limit: 50 });
+          setUsers(usersList);
+        } catch {
+          console.warn("Failed to load users list");
+        }
+      } catch (err) {
+        console.error("Failed to load user profile:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   const handleSave = () => {
     setSaving(true);
@@ -126,6 +135,14 @@ export function SettingsPage() {
       setSaving(false);
     }, 1000);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -201,23 +218,19 @@ export function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="fullName">姓名</Label>
-                  <Input id="fullName" defaultValue={currentUser.fullName} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="username">用户名</Label>
-                  <Input id="username" defaultValue={currentUser.username} />
+                  <Input id="fullName" defaultValue={currentUser?.name || ""} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">邮箱</Label>
-                  <Input id="email" type="email" defaultValue={currentUser.email} />
+                  <Input id="email" type="email" defaultValue={currentUser?.email || ""} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">手机号</Label>
-                  <Input id="phone" defaultValue={currentUser.phone} />
+                  <Input id="phone" defaultValue={currentUser?.phone || ""} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="role">角色</Label>
-                  <Select defaultValue={currentUser.role}>
+                  <Select defaultValue={currentUser?.role || "VIEWER"}>
                     <SelectTrigger id="role">
                       <SelectValue />
                     </SelectTrigger>
@@ -444,27 +457,27 @@ export function SettingsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {mockUsers.map((user) => (
+                    {users.map((user) => (
                       <tr key={user.id} className="border-b hover:bg-muted/50">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                               <User className="w-4 h-4 text-primary" />
                             </div>
-                            <span className="font-medium">{user.fullName}</span>
+                            <span className="font-medium">{user.name}</span>
                           </div>
                         </td>
                         <td className="py-3 px-4 text-sm text-muted-foreground">
-                          {user.username}
+                          {user.email}
                         </td>
                         <td className="py-3 px-4">
-                          <Badge className={ROLES[user.role as keyof typeof ROLES].color}>
-                            {ROLES[user.role as keyof typeof ROLES].label}
+                          <Badge className={ROLES[user.role as keyof typeof ROLES]?.color || "bg-slate-100 text-slate-700"}>
+                            {ROLES[user.role as keyof typeof ROLES]?.label || user.role}
                           </Badge>
                         </td>
                         <td className="py-3 px-4">
-                          <Badge variant={user.status === "active" ? "default" : "secondary"}>
-                            {user.status === "active" ? "活跃" : "停用"}
+                          <Badge variant={user.isActive ? "default" : "secondary"}>
+                            {user.isActive ? "活跃" : "停用"}
                           </Badge>
                         </td>
                         <td className="py-3 px-4">
@@ -479,6 +492,13 @@ export function SettingsPage() {
                         </td>
                       </tr>
                     ))}
+                    {users.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                          暂无用户数据
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import {
@@ -10,6 +10,7 @@ import {
   Building2,
   MapPin,
   FileText,
+  Loader2,
 } from "lucide-react";
 
 import { Button } from "../components/ui/button";
@@ -24,28 +25,32 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { AircraftStatusBadge } from "../components/common/status-badge";
+import {
+  fullAircraftService,
+  fleetService,
+  Aircraft,
+  AircraftStatus,
+  Fleet,
+} from "../services/fleet.service";
 
-// Mock fleets data
-const MOCK_FLEETS = [
-  { id: "fleet-001", name: "巡检机队A", code: "INSP-A" },
-  { id: "fleet-002", name: "物流机队B", code: "LOGI-B" },
-  { id: "fleet-003", name: "应急机队C", code: "EMER-C" },
-];
+/**
+ * Map backend status to frontend status badge
+ */
+const STATUS_MAP: Record<AircraftStatus, "SERVICEABLE" | "MAINTENANCE" | "GROUNDED" | "RETIRED"> = {
+  AVAILABLE: "SERVICEABLE",
+  IN_MAINTENANCE: "MAINTENANCE",
+  AOG: "GROUNDED",
+  RETIRED: "RETIRED",
+};
 
-// Mock aircraft data for editing
-const MOCK_AIRCRAFT: Record<string, AircraftFormData> = {
-  "edit-001": {
-    registration: "B-7011U",
-    serialNumber: "SN-DJ001",
-    model: "DJI Matrice 350 RTK",
-    manufacturer: "DJI",
-    fleetId: "fleet-001",
-    status: "SERVICEABLE",
-    baseLocation: "上海基地",
-    productionDate: "2023-06-15",
-    purchaseDate: "2023-07-20",
-    remarks: "主力巡检无人机，设备状态良好",
-  },
+/**
+ * Map frontend status to backend status
+ */
+const REVERSE_STATUS_MAP: Record<"SERVICEABLE" | "MAINTENANCE" | "GROUNDED" | "RETIRED", AircraftStatus> = {
+  SERVICEABLE: "AVAILABLE",
+  MAINTENANCE: "IN_MAINTENANCE",
+  GROUNDED: "AOG",
+  RETIRED: "RETIRED",
 };
 
 type AircraftFormData = {
@@ -67,16 +72,20 @@ export function AircraftFormPage() {
   const isEditing = id !== undefined && id !== "new";
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fleets, setFleets] = useState<Fleet[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Initialize form with mock data if editing
+  // Initialize form with default values
   const {
     register,
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors, isDirty },
   } = useForm<AircraftFormData>({
-    defaultValues: isEditing && id ? MOCK_AIRCRAFT[id] : {
+    defaultValues: {
       registration: "",
       serialNumber: "",
       model: "",
@@ -89,6 +98,43 @@ export function AircraftFormPage() {
       remarks: "",
     },
   });
+
+  // Load fleets and aircraft data on mount
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        // Load fleets for the dropdown
+        const fleetsData = await fleetService.list();
+        setFleets(fleetsData);
+
+        // If editing, load the aircraft data
+        if (isEditing && id) {
+          const aircraft = await fullAircraftService.getById(id);
+          reset({
+            registration: aircraft.registrationNumber,
+            serialNumber: aircraft.serialNumber,
+            model: aircraft.model,
+            manufacturer: aircraft.manufacturer,
+            fleetId: aircraft.fleetId,
+            status: STATUS_MAP[aircraft.status],
+            baseLocation: "", // Not available in backend, user can fill
+            productionDate: "", // Not available in backend, user can fill
+            purchaseDate: "", // Not available in backend, user can fill
+            remarks: "", // Not available in backend, user can fill
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load data:", err);
+        setLoadError(isEditing ? "无法加载飞机信息" : "无法加载机队列表");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, [id, isEditing, reset]);
 
   const selectedStatus = watch("status");
   const selectedFleet = watch("fleetId");
@@ -115,6 +161,52 @@ export function AircraftFormPage() {
       navigate("/aircraft");
     }
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-4 md:p-8">
+        <div className="mx-auto max-w-4xl">
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+            <span className="ml-3 text-slate-500">加载中...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-4 md:p-8">
+        <div className="mx-auto max-w-4xl">
+          <div className="mb-6 flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/aircraft")}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-2xl font-bold text-slate-900">
+              {isEditing ? "编辑飞机" : "新增飞机"}
+            </h1>
+          </div>
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Plane className="mx-auto mb-4 h-12 w-12 text-slate-300" />
+              <h3 className="mb-2 text-lg font-semibold">{loadError}</h3>
+              <p className="mb-4 text-slate-500">请稍后重试或返回列表页面</p>
+              <Button onClick={() => navigate("/aircraft")}>
+                返回列表
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
@@ -253,11 +345,17 @@ export function AircraftFormPage() {
                       <SelectValue placeholder="选择所属机队" />
                     </SelectTrigger>
                     <SelectContent>
-                      {MOCK_FLEETS.map((fleet) => (
-                        <SelectItem key={fleet.id} value={fleet.id}>
-                          {fleet.name} ({fleet.code})
+                      {fleets.length > 0 ? (
+                        fleets.map((fleet) => (
+                          <SelectItem key={fleet.id} value={fleet.id}>
+                            {fleet.name} ({fleet.code})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>
+                          暂无可选机队
                         </SelectItem>
-                      ))}
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

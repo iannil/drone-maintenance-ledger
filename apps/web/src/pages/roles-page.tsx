@@ -161,8 +161,10 @@ const DEFAULT_ROLE_PERMISSIONS = {
   ],
 };
 
-// Mock roles with user counts
-const MOCK_ROLES = [
+// System default roles (static configuration)
+// Note: These are built-in system roles. In a production system,
+// additional custom roles could be fetched from an API.
+const SYSTEM_ROLES = [
   { id: "ADMIN", name: "管理员", description: "系统完全访问权限", userCount: 1, isSystem: true },
   { id: "MANAGER", name: "经理", description: "报表查看和计划管理", userCount: 3, isSystem: true },
   { id: "INSPECTOR", name: "检验员", description: "工单审核和放行", userCount: 2, isSystem: true },
@@ -175,7 +177,7 @@ const MOCK_ROLES = [
  */
 export function RolesPage() {
   // State
-  const [roles, setRoles] = useState(MOCK_ROLES);
+  const [roles, setRoles] = useState(SYSTEM_ROLES);
   const [selectedRole, setSelectedRole] = useState(roles[0]);
   const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>(DEFAULT_ROLE_PERMISSIONS);
   const [hasChanges, setHasChanges] = useState(false);

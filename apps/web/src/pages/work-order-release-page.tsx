@@ -14,6 +14,7 @@ import {
   Eye,
   Download,
   Printer,
+  Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
@@ -37,142 +38,175 @@ import {
 } from "../components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { AircraftStatusBadge } from "../components/common/status-badge";
+import {
+  workOrderService,
+  WorkOrder,
+  WorkOrderTask,
+  WORK_ORDER_TYPE_LABELS,
+  WORK_ORDER_STATUS_LABELS,
+} from "../services/work-order.service";
+import { fullAircraftService, Aircraft } from "../services/fleet.service";
+import { userService, User as UserType, ROLE_LABELS } from "../services/user.service";
 
-// Mock work order data
-const MOCK_WORK_ORDER = {
-  id: "wo-001",
-  workOrderNumber: "WO-2026-0116",
-  title: "电机定期检查 - B-7011U",
-  description: "每50飞行小时检查电机状态，测试电机转速和温度",
-  type: "SCHEDULED",
-  priority: "HIGH",
-  status: "INSPECTION_REQUIRED",
-  aircraftId: "ac-001",
-  aircraftRegistration: "B-7011U",
-  aircraftModel: "DJI M350 RTK",
-  assignedTo: "张三",
-  completedBy: "张三",
-  completedAt: "2026-01-16T14:30:00",
-  createdAt: "2026-01-15T09:00:00",
-  dueDate: "2026-01-20T18:00:00",
-  estimatedHours: 2,
-  actualHours: 2.5,
-  notes: "所有任务已完成，发现左前电机有轻微磨损痕迹。",
-  tasks: [
-    {
-      id: "task-001",
-      title: "外观检查 - 左前电机",
-      description: "检查电机外观是否有损伤、裂纹或异物",
-      isRii: false,
-      status: "COMPLETED",
-      completedBy: "张三",
-      completedAt: "2026-01-16T10:00:00",
-      photos: ["photo1.jpg"],
-      notes: "发现轻微磨损痕迹，不影响使用",
-    },
-    {
-      id: "task-002",
-      title: "外观检查 - 右前电机",
-      description: "检查电机外观是否有损伤、裂纹或异物",
-      isRii: false,
-      status: "COMPLETED",
-      completedBy: "张三",
-      completedAt: "2026-01-16T10:15:00",
-      photos: [],
-      notes: "正常",
-    },
-    {
-      id: "task-003",
-      title: "外观检查 - 左后电机",
-      description: "检查电机外观是否有损伤、裂纹或异物",
-      isRii: false,
-      status: "COMPLETED",
-      completedBy: "张三",
-      completedAt: "2026-01-16T10:30:00",
-      photos: [],
-      notes: "正常",
-    },
-    {
-      id: "task-004",
-      title: "外观检查 - 右后电机",
-      description: "检查电机外观是否有损伤、裂纹或异物",
-      isRii: false,
-      status: "COMPLETED",
-      completedBy: "张三",
-      completedAt: "2026-01-16T10:45:00",
-      photos: [],
-      notes: "正常",
-    },
-    {
-      id: "task-005",
-      title: "转速测试 - 左前电机",
-      description: "测试电机最大转速，检查是否平稳",
-      isRii: true,
-      status: "COMPLETED",
-      completedBy: "张三",
-      completedAt: "2026-01-16T11:00:00",
-      photos: ["photo2.jpg"],
-      notes: "转速正常，无异常震动",
-      inspector: null,
-      inspectedAt: null,
-    },
-    {
-      id: "task-006",
-      title: "转速测试 - 右前电机",
-      description: "测试电机最大转速，检查是否平稳",
-      isRii: true,
-      status: "COMPLETED",
-      completedBy: "张三",
-      completedAt: "2026-01-16T12:00:00",
-      photos: ["photo3.jpg"],
-      notes: "转速正常",
-      inspector: null,
-      inspectedAt: null,
-    },
-    {
-      id: "task-007",
-      title: "温度检查",
-      description: "检查电机工作温度是否在正常范围内",
-      isRii: false,
-      status: "COMPLETED",
-      completedBy: "张三",
-      completedAt: "2026-01-16T12:30:00",
-      photos: [],
-      notes: "温度正常",
-    },
-  ],
-  partsUsed: [
-    { id: "part-001", name: "M3螺丝", quantity: 4, unit: "个", partNumber: "SCREW-M3-10" },
-  ],
-  attachments: [
-    { id: "att-001", name: "检查表.pdf", type: "pdf", size: "245KB" },
-  ],
-};
-
-// Current inspector (mock)
-const CURRENT_INSPECTOR = {
-  id: "user-004",
-  name: "李四",
-  license: "CAAC-I-2020001",
-  role: "INSPECTOR",
-};
+// Work order with additional UI fields
+interface ReleaseWorkOrder {
+  id: string;
+  workOrderNumber: string;
+  title: string;
+  description: string | null;
+  type: string;
+  priority: string;
+  status: string;
+  aircraftId: string | null;
+  aircraftRegistration: string | null;
+  aircraftModel: string | null;
+  assignedTo: string | null;
+  completedBy: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  dueDate: string | null;
+  estimatedHours: number;
+  actualHours: number;
+  notes: string | null;
+  tasks: {
+    id: string;
+    title: string;
+    description: string | null;
+    isRii: boolean;
+    status: string;
+    completedBy: string | null;
+    completedAt: string | null;
+    photos: string[];
+    notes: string | null;
+    inspector?: string | null;
+    inspectedAt?: string | null;
+  }[];
+  partsUsed: { id: string; name: string; quantity: number; unit: string; partNumber: string }[];
+  attachments: { id: string; name: string; type: string; size: string }[];
+}
 
 /**
  * Airworthiness release page for inspectors to review and sign off work orders
  */
 export function WorkOrderReleasePage() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  // State
-  const [workOrder, setWorkOrder] = useState(MOCK_WORK_ORDER);
+  // Loading and error states
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Data states
+  const [workOrder, setWorkOrder] = useState<ReleaseWorkOrder | null>(null);
+  const [currentInspector, setCurrentInspector] = useState<UserType | null>(null);
+
+  // UI states
   const [approvalStatus, setApprovalStatus] = useState<"APPROVED" | "REJECTED" | null>(null);
   const [inspectorNotes, setInspectorNotes] = useState("");
-  const [signature, setSignature] = useState(CURRENT_INSPECTOR.name);
+  const [signature, setSignature] = useState("");
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [showSignDialog, setShowSignDialog] = useState(false);
-  const [selectedTaskForReview, setSelectedTaskForReview] = useState<typeof MOCK_WORK_ORDER.tasks[0] | null>(null);
+  const [selectedTaskForReview, setSelectedTaskForReview] = useState<ReleaseWorkOrder["tasks"][0] | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+
+  // Load work order data
+  useEffect(() => {
+    async function loadData() {
+      if (!id) return;
+      setIsLoading(true);
+      setError(null);
+      try {
+        // Load current user as inspector
+        const inspector = await userService.getProfile();
+        setCurrentInspector(inspector);
+        setSignature(inspector.name);
+
+        // Load work order
+        const wo = await workOrderService.getById(id);
+        const tasks = await workOrderService.getTasks(id);
+
+        // Load aircraft info
+        let aircraftReg = null;
+        let aircraftModel = null;
+        if (wo.aircraftId) {
+          try {
+            const aircraft = await fullAircraftService.getById(wo.aircraftId);
+            aircraftReg = aircraft.registrationNumber;
+            aircraftModel = aircraft.model;
+          } catch {
+            console.warn("Failed to load aircraft info");
+          }
+        }
+
+        // Map to ReleaseWorkOrder format
+        const releaseWo: ReleaseWorkOrder = {
+          id: wo.id,
+          workOrderNumber: wo.orderNumber,
+          title: wo.title,
+          description: wo.description,
+          type: wo.type,
+          priority: wo.priority,
+          status: wo.status,
+          aircraftId: wo.aircraftId,
+          aircraftRegistration: aircraftReg,
+          aircraftModel: aircraftModel,
+          assignedTo: wo.assignedTo,
+          completedBy: null,
+          completedAt: wo.completedAt ? new Date(wo.completedAt).toISOString() : null,
+          createdAt: new Date(wo.createdAt).toISOString(),
+          dueDate: wo.scheduledEnd ? new Date(wo.scheduledEnd).toISOString() : null,
+          estimatedHours: 0,
+          actualHours: 0,
+          notes: wo.completionNotes || wo.description,
+          tasks: tasks.map((t) => ({
+            id: t.id,
+            title: t.title,
+            description: t.description,
+            isRii: t.isRii,
+            status: t.status,
+            completedBy: null,
+            completedAt: t.completedAt ? new Date(t.completedAt).toISOString() : null,
+            photos: [],
+            notes: t.notes,
+            inspector: null,
+            inspectedAt: null,
+          })),
+          partsUsed: [],
+          attachments: [],
+        };
+
+        setWorkOrder(releaseWo);
+      } catch (err) {
+        console.error("Failed to load work order:", err);
+        setError("无法加载工单信息");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, [id]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !workOrder) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 space-y-4">
+        <AlertCircle className="w-12 h-12 text-red-500" />
+        <h2 className="text-lg font-semibold">{error || "未找到工单"}</h2>
+        <Button variant="outline" onClick={() => navigate("/work-orders")}>
+          返回工单列表
+        </Button>
+      </div>
+    );
+  }
 
   // Calculated values
   const riiTasks = workOrder.tasks.filter((t) => t.isRii);
@@ -196,7 +230,7 @@ export function WorkOrderReleasePage() {
       workOrderId: workOrder.id,
       signature,
       inspectorNotes,
-      inspector: CURRENT_INSPECTOR,
+      inspector: currentInspector,
     });
     // TODO: API call to approve work order
     setShowSignDialog(false);
@@ -223,7 +257,7 @@ export function WorkOrderReleasePage() {
   };
 
   // View task details
-  const viewTaskDetails = (task: typeof MOCK_WORK_ORDER.tasks[0]) => {
+  const viewTaskDetails = (task: ReleaseWorkOrder["tasks"][0]) => {
     setSelectedTaskForReview(task);
   };
 
@@ -540,15 +574,15 @@ export function WorkOrderReleasePage() {
             <CardContent className="space-y-3">
               <div>
                 <p className="text-sm text-muted-foreground">姓名</p>
-                <p className="font-medium">{CURRENT_INSPECTOR.name}</p>
+                <p className="font-medium">{currentInspector?.name || "-"}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">执照号</p>
-                <p className="font-mono text-sm">{CURRENT_INSPECTOR.license}</p>
+                <p className="font-mono text-sm">{currentInspector?.licenseNumber || "-"}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">角色</p>
-                <p className="font-medium">检验员 (INSPECTOR)</p>
+                <p className="font-medium">{ROLE_LABELS[currentInspector?.role || "VIEWER"]}</p>
               </div>
             </CardContent>
           </Card>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useNavigate, useParams, Link, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   Save,
@@ -14,6 +14,7 @@ import {
   User,
   FileText,
   Wrench,
+  Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -44,9 +45,13 @@ import {
 } from "../components/ui/dialog";
 import { Checkbox } from "../components/ui/checkbox";
 import { AircraftStatusBadge } from "../components/common/status-badge";
+import { fullAircraftService, type Aircraft } from "../services/fleet.service";
+import { userService, type User as UserType } from "../services/user.service";
+import { pilotReportService, type PilotReportSeverity, SEVERITY_LABELS } from "../services/pilot-report.service";
+import { flightLogService, type FlightLog } from "../services/flight-log.service";
 
 // PIREP severity levels
-const SEVERITY_LEVELS = [
+const SEVERITY_LEVELS: { value: PilotReportSeverity; label: string; color: string; description: string }[] = [
   { value: "LOW", label: "轻微", color: "bg-yellow-100 text-yellow-700", description: "不影响飞行安全，可继续执行任务" },
   { value: "MEDIUM", label: "中等", color: "bg-orange-100 text-orange-700", description: "需要注意，建议完成任务后检查" },
   { value: "HIGH", label: "严重", color: "bg-red-100 text-red-700", description: "影响飞行安全，应立即降落检查" },
@@ -67,20 +72,6 @@ const FAULT_CATEGORIES = [
   { value: "OTHER", label: "其他", description: "未分类的问题" },
 ];
 
-// Mock aircraft data
-const MOCK_AIRCRAFT = [
-  { id: "ac-001", registration: "B-7011U", model: "DJI M350 RTK", status: "SERVICEABLE", totalFlightHours: 125.5 },
-  { id: "ac-002", registration: "B-7012U", model: "DJI M350 RTK", status: "SERVICEABLE", totalFlightHours: 89.3 },
-  { id: "ac-003", registration: "B-7013U", model: "DJI M300 RTK", status: "MAINTENANCE", totalFlightHours: 210.8 },
-  { id: "ac-004", registration: "B-7021U", model: "DJI Mavic 3E", status: "GROUNDED", totalFlightHours: 45.2 },
-];
-
-// Mock pilots
-const MOCK_PILOTS = [
-  { id: "user-001", name: "张飞手", license: "CAAC-U-2021001", role: "PILOT" },
-  { id: "user-002", name: "李飞手", license: "CAAC-U-2021002", role: "PILOT" },
-];
-
 interface PirepFormData {
   aircraftId: string;
   flightLogId: string;
@@ -89,7 +80,7 @@ interface PirepFormData {
   location: string;
   altitude: string;
   flightPhase: string;
-  severity: string;
+  severity: PilotReportSeverity;
   category: string;
   title: string;
   description: string;
@@ -107,12 +98,26 @@ interface PirepFormData {
 export function PirepFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const isEditing = Boolean(id);
+
+  // 从 location state 获取预设值（从飞行记录页面跳转时）
+  const presetAircraftId = location.state?.aircraftId || "";
+  const presetFlightLogId = location.state?.flightLogId || "";
+
+  // API 数据状态
+  const [aircraft, setAircraft] = useState<Aircraft[]>([]);
+  const [pilots, setPilots] = useState<UserType[]>([]);
+  const [flightLogs, setFlightLogs] = useState<FlightLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<PirepFormData>({
-    aircraftId: "",
-    flightLogId: "",
+    aircraftId: presetAircraftId,
+    flightLogId: presetFlightLogId,
     reporterId: "",
     occurrenceTime: new Date().toISOString().slice(0, 16),
     location: "",
@@ -131,7 +136,7 @@ export function PirepFormPage() {
   });
 
   // UI state
-  const [selectedAircraft, setSelectedAircraft] = useState<typeof MOCK_AIRCRAFT[0] | null>(null);
+  const [selectedAircraft, setSelectedAircraft] = useState<Aircraft | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [createdPirepId, setCreatedPirepId] = useState("");
@@ -148,15 +153,39 @@ export function PirepFormPage() {
     { value: "POST_FLIGHT", label: "着陆后" },
   ];
 
+  // 加载数据
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const [aircraftData, pilotsData, flightLogsData] = await Promise.all([
+          fullAircraftService.list(100),
+          userService.getPilots(100),
+          flightLogService.getRecent(50),
+        ]);
+        setAircraft(aircraftData);
+        setPilots(pilotsData);
+        setFlightLogs(flightLogsData);
+      } catch (err) {
+        console.error("Failed to load data:", err);
+        setLoadError("加载数据失败，请刷新页面重试");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
   // Update aircraft info when selection changes
   useEffect(() => {
     if (formData.aircraftId) {
-      const aircraft = MOCK_AIRCRAFT.find((a) => a.id === formData.aircraftId);
-      setSelectedAircraft(aircraft || null);
+      const ac = aircraft.find((a) => a.id === formData.aircraftId);
+      setSelectedAircraft(ac || null);
     } else {
       setSelectedAircraft(null);
     }
-  }, [formData.aircraftId]);
+  }, [formData.aircraftId, aircraft]);
 
   // Validate form
   const validateForm = (): boolean => {
@@ -174,13 +203,33 @@ export function PirepFormPage() {
   };
 
   // Handle form submission
-  const handleSubmit = () => {
-    if (validateForm()) {
-      const pirepId = `pirep-${Date.now()}`;
-      setCreatedPirepId(pirepId);
-      console.log("Submit PIREP:", formData);
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      // 构建 API 请求数据
+      const dto = {
+        aircraftId: formData.aircraftId,
+        flightLogId: formData.flightLogId && formData.flightLogId !== "none" ? formData.flightLogId : undefined,
+        title: formData.title,
+        description: `${formData.description}${formData.immediateAction ? `\n\n已采取措施: ${formData.immediateAction}` : ""}${formData.flightImpact && formData.flightImpactDescription ? `\n\n对飞行影响: ${formData.flightImpactDescription}` : ""}`,
+        severity: formData.severity,
+        affectedSystem: formData.category || undefined,
+        affectedComponent: undefined,
+        isAog: formData.severity === "CRITICAL",
+      };
+
+      const result = await pilotReportService.create(dto);
+      setCreatedPirepId(result.id);
       setShowSuccessDialog(true);
-      // TODO: API call to create/update PIREP
+    } catch (err) {
+      console.error("Submit error:", err);
+      setSubmitError(err instanceof Error ? err.message : "提交失败，请重试");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -253,12 +302,63 @@ export function PirepFormPage() {
           <Button variant="outline" onClick={() => navigate(-1)}>
             取消
           </Button>
-          <Button onClick={handleSubmit}>
-            <Save className="w-4 h-4 mr-2" />
-            {isEditing ? "保存修改" : "提交报告"}
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                提交中...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                {isEditing ? "保存修改" : "提交报告"}
+              </>
+            )}
           </Button>
         </div>
       </div>
+
+      {/* Loading state */}
+      {isLoading && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
+              <span className="text-blue-800">加载数据中...</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Error state */}
+      {loadError && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-red-800">加载失败</p>
+                <p className="text-sm text-red-700">{loadError}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Submit error */}
+      {submitError && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-red-800">提交失败</p>
+                <p className="text-sm text-red-700">{submitError}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Alert for severity */}
       {(formData.severity === "HIGH" || formData.severity === "CRITICAL") && (
@@ -294,19 +394,18 @@ export function PirepFormPage() {
                   <Select
                     value={formData.aircraftId}
                     onValueChange={(value) => updateField("aircraftId", value)}
+                    disabled={isLoading}
                   >
                     <SelectTrigger id="aircraft" className={errors.aircraftId ? "border-red-500" : ""}>
                       <SelectValue placeholder="选择飞机" />
                     </SelectTrigger>
                     <SelectContent>
-                      {MOCK_AIRCRAFT.map((aircraft) => (
-                        <SelectItem key={aircraft.id} value={aircraft.id}>
+                      {aircraft.map((ac) => (
+                        <SelectItem key={ac.id} value={ac.id}>
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">{aircraft.registration}</span>
+                            <span className="font-medium">{ac.registrationNumber}</span>
                             <span className="text-muted-foreground">·</span>
-                            <span className="text-sm">{aircraft.model}</span>
-                            <span className="text-muted-foreground">·</span>
-                            <AircraftStatusBadge status={aircraft.status as "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED"} />
+                            <span className="text-sm">{ac.model}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -323,15 +422,22 @@ export function PirepFormPage() {
                   <Select
                     value={formData.flightLogId}
                     onValueChange={(value) => updateField("flightLogId", value)}
+                    disabled={isLoading}
                   >
                     <SelectTrigger id="flightLog">
                       <SelectValue placeholder="选择飞行记录（可选）" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">无关联</SelectItem>
-                      <SelectItem value="fl-001">FL-20260116-001 · B-7011U · 1.2h</SelectItem>
-                      <SelectItem value="fl-002">FL-20260116-002 · B-7012U · 0.8h</SelectItem>
-                      <SelectItem value="fl-003">FL-20260115-001 · B-7011U · 2.1h</SelectItem>
+                      {flightLogs.map((fl) => {
+                        const flDate = new Date(fl.flightDate);
+                        const matchingAircraft = aircraft.find((a) => a.id === fl.aircraftId);
+                        return (
+                          <SelectItem key={fl.id} value={fl.id}>
+                            {flDate.toLocaleDateString("zh-CN")} · {matchingAircraft?.registrationNumber || "未知"} · {fl.flightHours}h
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
@@ -341,8 +447,13 @@ export function PirepFormPage() {
               {selectedAircraft && (
                 <div className="p-3 bg-slate-50 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium">{selectedAircraft.registration}</span>
-                    <AircraftStatusBadge status={selectedAircraft.status as "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED"} />
+                    <span className="font-medium">{selectedAircraft.registrationNumber}</span>
+                    <Badge variant="outline">
+                      {selectedAircraft.status === "AVAILABLE" && "可用"}
+                      {selectedAircraft.status === "IN_MAINTENANCE" && "维护中"}
+                      {selectedAircraft.status === "AOG" && "停飞"}
+                      {selectedAircraft.status === "RETIRED" && "退役"}
+                    </Badge>
                   </div>
                   <div className="text-xs text-muted-foreground">
                     型号: {selectedAircraft.model} · 总飞行小时: {selectedAircraft.totalFlightHours}h
@@ -417,18 +528,21 @@ export function PirepFormPage() {
                   <Select
                     value={formData.reporterId}
                     onValueChange={(value) => updateField("reporterId", value)}
+                    disabled={isLoading}
                   >
                     <SelectTrigger id="reporter" className={errors.reporterId ? "border-red-500" : ""}>
                       <SelectValue placeholder="选择报告人" />
                     </SelectTrigger>
                     <SelectContent>
-                      {MOCK_PILOTS.map((pilot) => (
+                      {pilots.map((pilot) => (
                         <SelectItem key={pilot.id} value={pilot.id}>
                           <div>
                             <div className="font-medium">{pilot.name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              执照号: {pilot.license}
-                            </div>
+                            {pilot.licenseNumber && (
+                              <div className="text-xs text-muted-foreground">
+                                执照号: {pilot.licenseNumber}
+                              </div>
+                            )}
                           </div>
                         </SelectItem>
                       ))}

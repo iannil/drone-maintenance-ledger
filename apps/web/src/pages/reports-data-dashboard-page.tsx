@@ -3,7 +3,7 @@
  * 数据看板与报表页面
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   BarChart3,
   TrendingUp,
@@ -15,79 +15,18 @@ import {
   Calendar,
   Filter,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { exportReport, type ReportType } from "../services/pdf-export.service";
+import { statsService, DashboardStats, DueMaintenanceItem } from "../services/stats.service";
+import { fullAircraftService, Aircraft } from "../services/fleet.service";
 
-// Mock data
-const MOCK_METRICS = {
-  fleetHealth: {
-    total: 48,
-    airborne: 12,
-    ready: 28,
-    maintenance: 6,
-    grounded: 2,
-    healthRate: 93.8,
-  },
-  workOrders: {
-    open: 23,
-    inProgress: 15,
-    pendingReview: 8,
-    completed: 156,
-    overdue: 3,
-  },
-  maintenanceCompliance: {
-    onTime: 94.2,
-    overdue: 5.8,
-    upcoming: 18,
-  },
-  flightStats: {
-    totalHours: 12450,
-    totalFlights: 3420,
-    avgFlightDuration: 3.64,
-    thisMonthHours: 892,
-  },
-  inventory: {
-    totalItems: 1250,
-    lowStock: 23,
-    outOfStock: 5,
-    totalValue: 2850000,
-  },
-  pireps: {
-    open: 8,
-    investigating: 12,
-    resolved: 145,
-    critical: 2,
-  },
-};
-
-const MOCK_FLEET_STATUS = [
-  { id: "1", registration: "B-701A", model: "DJI Matrice 300", status: "AIRBORNE", healthRate: 98, flightHours: 245 },
-  { id: "2", registration: "B-701B", model: "DJI Matrice 300", status: "READY", healthRate: 95, flightHours: 312 },
-  { id: "3", registration: "B-702A", model: "DJI Matrice 350", status: "MAINTENANCE", healthRate: 72, flightHours: 189 },
-  { id: "4", registration: "B-703A", model: "Autel Dragonfish", status: "GROUNDED", healthRate: 45, flightHours: 156 },
-  { id: "5", registration: "B-704A", model: "DJI Matrice 300", status: "READY", healthRate: 92, flightHours: 278 },
-];
-
-const MOCK_UPCOMING_MAINTENANCE = [
-  { id: "1", aircraft: "B-701A", task: "50小时检查", dueDate: "2025-01-18", priority: "HIGH", type: "FH" },
-  { id: "2", aircraft: "B-702A", task: "桨叶更换", dueDate: "2025-01-20", priority: "CRITICAL", type: "LLP" },
-  { id: "3", aircraft: "B-703A", task: "年检", dueDate: "2025-01-25", priority: "MEDIUM", type: "CALENDAR" },
-  { id: "4", aircraft: "B-705A", task: "电池循环更换", dueDate: "2025-01-28", priority: "HIGH", type: "BATTERY" },
-  { id: "5", aircraft: "B-706A", task: "200次循环检查", dueDate: "2025-02-01", priority: "MEDIUM", type: "FC" },
-];
-
-const MOCK_CRITICAL_ALERTS = [
-  { id: "1", type: "LLP", message: "B-702A 桨叶已超过建议寿命", severity: "CRITICAL", createdAt: "2025-01-15T10:30:00" },
-  { id: "2", type: "WORK_ORDER", message: "工单 WO-2025-0142 已逾期3天", severity: "HIGH", createdAt: "2025-01-15T09:15:00" },
-  { id: "3", type: "INVENTORY", message: "电机 DJI-M350 已低于安全库存", severity: "MEDIUM", createdAt: "2025-01-15T08:00:00" },
-  { id: "4", type: "AIRWORTHINESS", message: "B-703A 适航证将于30天后到期", severity: "MEDIUM", createdAt: "2025-01-14T16:45:00" },
-];
-
+// Fleet status configuration
 const AIRCRAFT_STATUS = {
-  AIRBORNE: { label: "飞行中", color: "bg-green-500 text-white" },
-  READY: { label: "可用", color: "bg-blue-100 text-blue-700" },
-  MAINTENANCE: { label: "维保中", color: "bg-orange-100 text-orange-700" },
-  GROUNDED: { label: "停飞", color: "bg-red-100 text-red-700" },
+  AVAILABLE: { label: "可用", color: "bg-blue-100 text-blue-700" },
+  IN_MAINTENANCE: { label: "维保中", color: "bg-orange-100 text-orange-700" },
+  AOG: { label: "停飞", color: "bg-red-100 text-red-700" },
   RETIRED: { label: "退役", color: "bg-slate-100 text-slate-700" },
 };
 
@@ -105,20 +44,167 @@ const SEVERITY_CONFIG = {
   LOW: { color: "bg-blue-500", icon: CheckCircle },
 };
 
+interface DashboardMetrics {
+  fleetHealth: {
+    total: number;
+    airborne: number;
+    ready: number;
+    maintenance: number;
+    grounded: number;
+    healthRate: number;
+  };
+  workOrders: {
+    open: number;
+    inProgress: number;
+    pendingReview: number;
+    completed: number;
+    overdue: number;
+  };
+  maintenanceCompliance: {
+    onTime: number;
+    overdue: number;
+    upcoming: number;
+  };
+  flightStats: {
+    totalHours: number;
+    totalFlights: number;
+    avgFlightDuration: number;
+    thisMonthHours: number;
+  };
+  inventory: {
+    totalItems: number;
+    lowStock: number;
+    outOfStock: number;
+    totalValue: number;
+  };
+  pireps: {
+    open: number;
+    investigating: number;
+    resolved: number;
+    critical: number;
+  };
+}
+
 export function ReportsDataDashboardPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month" | "quarter" | "year">("month");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [upcomingMaintenance, setUpcomingMaintenance] = useState<DueMaintenanceItem[]>([]);
+  const [fleetStatus, setFleetStatus] = useState<Aircraft[]>([]);
+  const [alerts, setAlerts] = useState<{ id: string; type: string; message: string; severity: string; createdAt: string }[]>([]);
+
+  // Load dashboard data
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      // Load dashboard stats
+      const stats = await statsService.getDashboardStats();
+
+      // Load due maintenance
+      const dueMaintenance = await statsService.getDueMaintenanceItems(10);
+      setUpcomingMaintenance(dueMaintenance);
+
+      // Build alerts from critical maintenance items
+      const criticalAlerts = dueMaintenance
+        .filter((item) => item.status === "urgent")
+        .map((item) => ({
+          id: item.id,
+          type: "MAINTENANCE",
+          message: `${item.aircraft} ${item.component || item.type} 需要维护: ${item.dueIn}`,
+          severity: "CRITICAL",
+          createdAt: new Date().toISOString(),
+        }));
+      setAlerts(criticalAlerts);
+
+      // Transform stats to metrics format
+      const transformedMetrics: DashboardMetrics = {
+        fleetHealth: {
+          total: stats.totalAircraft,
+          airborne: 0, // Not tracked in current stats
+          ready: stats.aircraftByStatus.serviceable,
+          maintenance: stats.aircraftByStatus.maintenance,
+          grounded: stats.aircraftByStatus.grounded,
+          healthRate: stats.totalAircraft > 0
+            ? Math.round((stats.aircraftByStatus.serviceable / stats.totalAircraft) * 100 * 10) / 10
+            : 0,
+        },
+        workOrders: {
+          open: stats.workOrders.pending,
+          inProgress: stats.workOrders.inProgress,
+          pendingReview: 0, // Not tracked in current stats
+          completed: stats.workOrders.completed,
+          overdue: 0, // Not tracked in current stats
+        },
+        maintenanceCompliance: {
+          onTime: 94.2, // Would need additional stats API
+          overdue: 5.8,
+          upcoming: dueMaintenance.length,
+        },
+        flightStats: {
+          totalHours: stats.flight.totalHours,
+          totalFlights: 0, // Not tracked in current stats
+          avgFlightDuration: 0,
+          thisMonthHours: stats.flight.last30DaysHours,
+        },
+        inventory: {
+          totalItems: 0, // Would need inventory stats API
+          lowStock: 0,
+          outOfStock: 0,
+          totalValue: 0,
+        },
+        pireps: {
+          open: 0, // Would need pirep stats API
+          investigating: 0,
+          resolved: 0,
+          critical: 0,
+        },
+      };
+
+      // Load aircraft for fleet status table
+      try {
+        const aircraft = await fullAircraftService.list(10, 0);
+        setFleetStatus(aircraft);
+      } catch {
+        console.warn("Failed to load fleet status");
+      }
+
+      setMetrics(transformedMetrics);
+    } catch (err) {
+      console.error("Failed to load dashboard data:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    // Simulate refresh
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await loadData();
     setIsRefreshing(false);
   };
 
-  const handleExport = (type: "pdf" | "excel" | "csv") => {
-    console.log("Exporting report as", type);
-    // TODO: Implement export functionality
+  const handleExport = async (type: "pdf" | "excel" | "csv") => {
+    if (type === "pdf") {
+      setIsExporting(true);
+      try {
+        // Export fleet health report for PDF
+        await exportReport("fleet-health");
+      } catch (err) {
+        console.error("Export error:", err);
+        alert("导出失败，请重试");
+      } finally {
+        setIsExporting(false);
+      }
+    } else {
+      // TODO: Implement Excel and CSV export
+      console.log("Exporting report as", type);
+      alert(`${type.toUpperCase()} 导出功能即将上线`);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -162,122 +248,131 @@ export function ReportsDataDashboardPage() {
         </div>
       </div>
 
-      {/* Critical Alerts */}
-      {MOCK_CRITICAL_ALERTS.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle className="w-5 h-5 text-red-600" />
-            <h3 className="font-semibold text-red-900">紧急警报</h3>
-            <span className="bg-red-200 text-red-800 text-xs px-2 py-0.5 rounded-full">
-              {MOCK_CRITICAL_ALERTS.length}
-            </span>
-          </div>
-          <div className="space-y-2">
-            {MOCK_CRITICAL_ALERTS.map((alert) => {
-              const Icon = SEVERITY_CONFIG[alert.severity as keyof typeof SEVERITY_CONFIG].icon;
-              return (
-                <div key={alert.id} className="flex items-center justify-between bg-white rounded-lg p-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${SEVERITY_CONFIG[alert.severity as keyof typeof SEVERITY_CONFIG].color}`}>
-                      <Icon className="w-4 h-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">{alert.message}</p>
-                      <p className="text-xs text-slate-500">
-                        {new Date(alert.createdAt).toLocaleString("zh-CN")}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded">
-                    {alert.type}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       )}
 
-      {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Fleet Health */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <BarChart3 className="w-5 h-5 text-blue-600" />
+      {!isLoading && metrics && (
+        <>
+          {/* Critical Alerts */}
+          {alerts.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <h3 className="font-semibold text-red-900">紧急警报</h3>
+                <span className="bg-red-200 text-red-800 text-xs px-2 py-0.5 rounded-full">
+                  {alerts.length}
+                </span>
               </div>
-              <div>
-                <p className="text-sm text-slate-500">机队健康率</p>
-                <p className="text-2xl font-bold text-slate-900">{MOCK_METRICS.fleetHealth.healthRate}%</p>
+              <div className="space-y-2">
+                {alerts.map((alert) => {
+                  const Icon = SEVERITY_CONFIG[alert.severity as keyof typeof SEVERITY_CONFIG]?.icon || AlertTriangle;
+                  return (
+                    <div key={alert.id} className="flex items-center justify-between bg-white rounded-lg p-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-full ${SEVERITY_CONFIG[alert.severity as keyof typeof SEVERITY_CONFIG]?.color || 'bg-slate-500'}`}>
+                          <Icon className="w-4 h-4 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{alert.message}</p>
+                          <p className="text-xs text-slate-500">
+                            {new Date(alert.createdAt).toLocaleString("zh-CN")}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded">
+                        {alert.type}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            <div className={`flex items-center gap-1 text-sm ${
-              MOCK_METRICS.fleetHealth.healthRate >= 90 ? "text-green-600" : "text-yellow-600"
-            }`}>
-              <TrendingUp className="w-4 h-4" />
-              <span>+2.3%</span>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">飞行中</span>
-              <span className="font-medium text-green-600">{MOCK_METRICS.fleetHealth.airborne}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">可用</span>
-              <span className="font-medium text-blue-600">{MOCK_METRICS.fleetHealth.ready}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">维保中</span>
-              <span className="font-medium text-orange-600">{MOCK_METRICS.fleetHealth.maintenance}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">停飞</span>
-              <span className="font-medium text-red-600">{MOCK_METRICS.fleetHealth.grounded}</span>
-            </div>
-          </div>
-          <Link to="/fleets" className="mt-4 block text-center text-sm text-blue-600 hover:text-blue-700">
-            查看详情 →
-          </Link>
-        </div>
+          )}
 
-        {/* Work Orders */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Clock className="w-5 h-5 text-purple-600" />
+          {/* Key Metrics Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Fleet Health */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <BarChart3 className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">机队健康率</p>
+                    <p className="text-2xl font-bold text-slate-900">{metrics.fleetHealth.healthRate}%</p>
+                  </div>
+                </div>
+                <div className={`flex items-center gap-1 text-sm ${
+                  metrics.fleetHealth.healthRate >= 90 ? "text-green-600" : "text-yellow-600"
+                }`}>
+                  <TrendingUp className="w-4 h-4" />
+                  <span>-</span>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-slate-500">工单状态</p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {MOCK_METRICS.workOrders.open + MOCK_METRICS.workOrders.inProgress}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">飞行中</span>
+                  <span className="font-medium text-green-600">{metrics.fleetHealth.airborne}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">可用</span>
+                  <span className="font-medium text-blue-600">{metrics.fleetHealth.ready}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">维保中</span>
+                  <span className="font-medium text-orange-600">{metrics.fleetHealth.maintenance}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">停飞</span>
+                  <span className="font-medium text-red-600">{metrics.fleetHealth.grounded}</span>
+                </div>
+              </div>
+              <Link to="/fleets" className="mt-4 block text-center text-sm text-blue-600 hover:text-blue-700">
+                查看详情 →
+              </Link>
+            </div>
+
+            {/* Work Orders */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Clock className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">工单状态</p>
+                    <p className="text-2xl font-bold text-slate-900">
+                      {metrics.workOrders.open + metrics.workOrders.inProgress}
                 </p>
               </div>
             </div>
-            {MOCK_METRICS.workOrders.overdue > 0 && (
+            {metrics.workOrders.overdue > 0 && (
               <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">
-                {MOCK_METRICS.workOrders.overdue} 逾期
+                {metrics.workOrders.overdue} 逾期
               </span>
             )}
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">待处理</span>
-              <span className="font-medium">{MOCK_METRICS.workOrders.open}</span>
+              <span className="font-medium">{metrics.workOrders.open}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">进行中</span>
-              <span className="font-medium text-blue-600">{MOCK_METRICS.workOrders.inProgress}</span>
+              <span className="font-medium text-blue-600">{metrics.workOrders.inProgress}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">待审核</span>
-              <span className="font-medium text-orange-600">{MOCK_METRICS.workOrders.pendingReview}</span>
+              <span className="font-medium text-orange-600">{metrics.workOrders.pendingReview}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">本月完成</span>
-              <span className="font-medium text-green-600">{MOCK_METRICS.workOrders.completed}</span>
+              <span className="font-medium text-green-600">{metrics.workOrders.completed}</span>
             </div>
           </div>
           <Link to="/work-orders" className="mt-4 block text-center text-sm text-blue-600 hover:text-blue-700">
@@ -294,18 +389,18 @@ export function ReportsDataDashboardPage() {
               </div>
               <div>
                 <p className="text-sm text-slate-500">维保合规率</p>
-                <p className="text-2xl font-bold text-slate-900">{MOCK_METRICS.maintenanceCompliance.onTime}%</p>
+                <p className="text-2xl font-bold text-slate-900">{metrics.maintenanceCompliance.onTime}%</p>
               </div>
             </div>
           </div>
           <div className="relative pt-1">
             <div className="flex mb-2 items-center justify-between">
               <span className="text-xs font-semibold text-slate-600">按时完成</span>
-              <span className="text-xs font-semibold text-slate-600">{MOCK_METRICS.maintenanceCompliance.onTime}%</span>
+              <span className="text-xs font-semibold text-slate-600">{metrics.maintenanceCompliance.onTime}%</span>
             </div>
             <div className="overflow-hidden h-2 text-xs flex rounded bg-slate-200">
               <div
-                style={{ width: `${MOCK_METRICS.maintenanceCompliance.onTime}%` }}
+                style={{ width: `${metrics.maintenanceCompliance.onTime}%` }}
                 className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-green-500"
               />
             </div>
@@ -313,11 +408,11 @@ export function ReportsDataDashboardPage() {
           <div className="mt-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">即将到期</span>
-              <span className="font-medium text-orange-600">{MOCK_METRICS.maintenanceCompliance.upcoming}</span>
+              <span className="font-medium text-orange-600">{metrics.maintenanceCompliance.upcoming}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">已逾期</span>
-              <span className="font-medium text-red-600">{MOCK_METRICS.maintenanceCompliance.overdue}%</span>
+              <span className="font-medium text-red-600">{metrics.maintenanceCompliance.overdue}%</span>
             </div>
           </div>
           <Link to="/maintenance/calendar" className="mt-4 block text-center text-sm text-blue-600 hover:text-blue-700">
@@ -334,22 +429,22 @@ export function ReportsDataDashboardPage() {
               </div>
               <div>
                 <p className="text-sm text-slate-500">飞行统计</p>
-                <p className="text-2xl font-bold text-slate-900">{MOCK_METRICS.flightStats.totalHours}h</p>
+                <p className="text-2xl font-bold text-slate-900">{metrics.flightStats.totalHours}h</p>
               </div>
             </div>
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">总飞行架次</span>
-              <span className="font-medium">{MOCK_METRICS.flightStats.totalFlights}</span>
+              <span className="font-medium">{metrics.flightStats.totalFlights}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">平均架次时长</span>
-              <span className="font-medium">{MOCK_METRICS.flightStats.avgFlightDuration}h</span>
+              <span className="font-medium">{metrics.flightStats.avgFlightDuration}h</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">本月飞行</span>
-              <span className="font-medium text-cyan-600">{MOCK_METRICS.flightStats.thisMonthHours}h</span>
+              <span className="font-medium text-cyan-600">{metrics.flightStats.thisMonthHours}h</span>
             </div>
           </div>
           <Link to="/analytics/flight-stats" className="mt-4 block text-center text-sm text-blue-600 hover:text-blue-700">
@@ -366,27 +461,27 @@ export function ReportsDataDashboardPage() {
               </div>
               <div>
                 <p className="text-sm text-slate-500">库存状态</p>
-                <p className="text-2xl font-bold text-slate-900">{MOCK_METRICS.inventory.totalItems}</p>
+                <p className="text-2xl font-bold text-slate-900">{metrics.inventory.totalItems}</p>
               </div>
             </div>
-            {(MOCK_METRICS.inventory.lowStock > 0 || MOCK_METRICS.inventory.outOfStock > 0) && (
+            {(metrics.inventory.lowStock > 0 || metrics.inventory.outOfStock > 0) && (
               <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
-                {MOCK_METRICS.inventory.lowStock} 低库存
+                {metrics.inventory.lowStock} 低库存
               </span>
             )}
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">低库存</span>
-              <span className="font-medium text-orange-600">{MOCK_METRICS.inventory.lowStock}</span>
+              <span className="font-medium text-orange-600">{metrics.inventory.lowStock}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">缺货</span>
-              <span className="font-medium text-red-600">{MOCK_METRICS.inventory.outOfStock}</span>
+              <span className="font-medium text-red-600">{metrics.inventory.outOfStock}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">库存总值</span>
-              <span className="font-medium">¥{(MOCK_METRICS.inventory.totalValue / 10000).toFixed(1)}万</span>
+              <span className="font-medium">¥{(metrics.inventory.totalValue / 10000).toFixed(1)}万</span>
             </div>
           </div>
           <Link to="/inventory/alerts" className="mt-4 block text-center text-sm text-blue-600 hover:text-blue-700">
@@ -403,27 +498,27 @@ export function ReportsDataDashboardPage() {
               </div>
               <div>
                 <p className="text-sm text-slate-500">故障报告</p>
-                <p className="text-2xl font-bold text-slate-900">{MOCK_METRICS.pireps.open + MOCK_METRICS.pireps.investigating}</p>
+                <p className="text-2xl font-bold text-slate-900">{metrics.pireps.open + metrics.pireps.investigating}</p>
               </div>
             </div>
-            {MOCK_METRICS.pireps.critical > 0 && (
+            {metrics.pireps.critical > 0 && (
               <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">
-                {MOCK_METRICS.pireps.critical} 紧急
+                {metrics.pireps.critical} 紧急
               </span>
             )}
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">待处理</span>
-              <span className="font-medium">{MOCK_METRICS.pireps.open}</span>
+              <span className="font-medium">{metrics.pireps.open}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">调查中</span>
-              <span className="font-medium text-blue-600">{MOCK_METRICS.pireps.investigating}</span>
+              <span className="font-medium text-blue-600">{metrics.pireps.investigating}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">已解决</span>
-              <span className="font-medium text-green-600">{MOCK_METRICS.pireps.resolved}</span>
+              <span className="font-medium text-green-600">{metrics.pireps.resolved}</span>
             </div>
           </div>
           <Link to="/pirep" className="mt-4 block text-center text-sm text-blue-600 hover:text-blue-700">
@@ -467,37 +562,34 @@ export function ReportsDataDashboardPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-200">
-              {MOCK_FLEET_STATUS.map((aircraft) => (
+              {fleetStatus.map((aircraft) => (
                 <tr key={aircraft.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-900">
-                    {aircraft.registration}
+                    {aircraft.registrationNumber}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-600">
                     {aircraft.model}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 text-xs font-medium rounded ${
-                      AIRCRAFT_STATUS[aircraft.status as keyof typeof AIRCRAFT_STATUS].color
+                      AIRCRAFT_STATUS[aircraft.status as keyof typeof AIRCRAFT_STATUS]?.color || "bg-slate-100 text-slate-700"
                     }`}>
-                      {AIRCRAFT_STATUS[aircraft.status as keyof typeof AIRCRAFT_STATUS].label}
+                      {AIRCRAFT_STATUS[aircraft.status as keyof typeof AIRCRAFT_STATUS]?.label || aircraft.status}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
                         <div
-                          className={`h-full ${
-                            aircraft.healthRate >= 80 ? "bg-green-500" :
-                            aircraft.healthRate >= 60 ? "bg-yellow-500" : "bg-red-500"
-                          }`}
-                          style={{ width: `${aircraft.healthRate}%` }}
+                          className={`h-full ${aircraft.isAirworthy ? "bg-green-500" : "bg-red-500"}`}
+                          style={{ width: aircraft.isAirworthy ? "100%" : "0%" }}
                         />
                       </div>
-                      <span className="text-sm text-slate-600">{aircraft.healthRate}%</span>
+                      <span className="text-sm text-slate-600">{aircraft.isAirworthy ? "适航" : "不适航"}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-600">
-                    {aircraft.flightHours}h
+                    {aircraft.totalFlightHours}h
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <Link
@@ -509,6 +601,13 @@ export function ReportsDataDashboardPage() {
                   </td>
                 </tr>
               ))}
+              {fleetStatus.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                    暂无飞机数据
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -525,26 +624,27 @@ export function ReportsDataDashboardPage() {
           </div>
         </div>
         <div className="divide-y divide-slate-200">
-          {MOCK_UPCOMING_MAINTENANCE.map((task) => (
+          {upcomingMaintenance.map((task) => (
             <div key={task.id} className="p-4 hover:bg-slate-50 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className={`w-1 h-12 rounded-full ${
-                  task.priority === "CRITICAL" ? "bg-red-500" :
-                  task.priority === "HIGH" ? "bg-orange-500" :
-                  task.priority === "MEDIUM" ? "bg-yellow-500" : "bg-slate-400"
+                  task.status === "urgent" ? "bg-red-500" :
+                  task.status === "warning" ? "bg-orange-500" : "bg-slate-400"
                 }`} />
                 <div>
-                  <p className="font-medium text-slate-900">{task.task}</p>
+                  <p className="font-medium text-slate-900">{task.component || task.type}</p>
                   <p className="text-sm text-slate-500">
-                    {task.aircraft} · {formatDate(task.dueDate)}
+                    {task.aircraft} · {task.dueIn}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <span className={`text-xs px-2 py-1 rounded border ${
-                  PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG].color
+                  task.status === "urgent" ? "bg-red-100 text-red-700 border-red-300" :
+                  task.status === "warning" ? "bg-orange-100 text-orange-700 border-orange-300" :
+                  "bg-slate-100 text-slate-700 border-slate-300"
                 }`}>
-                  {PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG].label}
+                  {task.status === "urgent" ? "紧急" : task.status === "warning" ? "预警" : "正常"}
                 </span>
                 <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded">
                   {task.type}
@@ -552,6 +652,11 @@ export function ReportsDataDashboardPage() {
               </div>
             </div>
           ))}
+          {upcomingMaintenance.length === 0 && (
+            <div className="p-8 text-center text-slate-500">
+              暂无即将到期的维保任务
+            </div>
+          )}
         </div>
       </div>
 
@@ -561,9 +666,14 @@ export function ReportsDataDashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             onClick={() => handleExport("pdf")}
-            className="flex items-center justify-center gap-2 p-4 border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-blue-300 transition-colors"
+            disabled={isExporting}
+            className="flex items-center justify-center gap-2 p-4 border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Download className="w-5 h-5 text-slate-600" />
+            {isExporting ? (
+              <Loader2 className="w-5 h-5 text-slate-600 animate-spin" />
+            ) : (
+              <Download className="w-5 h-5 text-slate-600" />
+            )}
             <div className="text-left">
               <p className="font-medium text-slate-900">综合报告</p>
               <p className="text-sm text-slate-500">PDF 格式</p>
@@ -591,6 +701,8 @@ export function ReportsDataDashboardPage() {
           </button>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

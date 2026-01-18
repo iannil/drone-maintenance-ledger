@@ -3,7 +3,7 @@
  * 采购申请页面
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   Search,
@@ -19,223 +19,61 @@ import {
   Clock,
   AlertCircle,
   ShoppingCart,
+  Loader2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
-// Mock data
-const MOCK_REQUESTS = [
-  {
-    id: "PR-2025-0189",
-    title: "桨叶 M350 批量采购",
-    requestDate: "2025-01-15T10:30:00",
-    requiredDate: "2025-01-30T00:00:00",
-    status: "PENDING_APPROVAL",
-    priority: "HIGH",
-    requestType: "STOCK",
-    requestedBy: {
-      id: "U-001",
-      name: "李采购",
-      department: "采购部",
-    },
-    items: [
-      {
-        id: "1",
-        partNumber: "PROP-M350-01",
-        name: "桨叶 M350",
-        quantity: 50,
-        unitPrice: 350,
-        estimatedPrice: 17500,
-        supplier: "大疆创新科技有限公司",
-        reason: "库存不足，需补充安全库存",
-      },
-    ],
-    totalEstimated: 17500,
-    currency: "CNY",
-    justification: "当前库存低于安全库存水平，急需补充以保证日常维修需求",
-    approvedBy: null,
-    approvedAt: null,
-    rejectionReason: null,
-    purchaseOrderId: null,
-    attachments: [
-      { id: "1", name: "库存报表.pdf", type: "PDF", size: "128KB" },
-    ],
-    createdAt: "2025-01-15T10:30:00",
-    updatedAt: "2025-01-15T10:30:00",
-  },
-  {
-    id: "PR-2025-0188",
-    title: "电池组紧急采购",
-    requestDate: "2025-01-14T14:20:00",
-    requiredDate: "2025-01-20T00:00:00",
-    status: "APPROVED",
-    priority: "URGENT",
-    requestType: "URGENT",
-    requestedBy: {
-      id: "U-002",
-      name: "张维修",
-      department: "维修部",
-    },
-    items: [
-      {
-        id: "1",
-        partNumber: "BATT-M350-01",
-        name: "电池组 M350",
-        quantity: 10,
-        unitPrice: 2800,
-        estimatedPrice: 28000,
-        supplier: "蓝天电池科技有限公司",
-        reason: "多块电池达到循环寿命上限",
-      },
-    ],
-    totalEstimated: 28000,
-    currency: "CNY",
-    justification: "10块电池已达到300次循环上限，无法继续使用，影响飞行任务",
-    approvedBy: {
-      id: "U-003",
-      name: "王主管",
-      role: "MANAGER",
-    },
-    approvedAt: "2025-01-14T16:00:00",
-    rejectionReason: null,
-    purchaseOrderId: "PO-2025-0141",
-    attachments: [],
-    createdAt: "2025-01-14T14:20:00",
-    updatedAt: "2025-01-14T16:00:00",
-  },
-  {
-    id: "PR-2025-0187",
-    title: "云台相机年度采购计划",
-    requestDate: "2025-01-12T09:15:00",
-    requiredDate: "2025-02-28T00:00:00",
-    status: "PURCHASED",
-    priority: "NORMAL",
-    requestType: "PLANNED",
-    requestedBy: {
-      id: "U-004",
-      name: "赵计划",
-      department: "计划部",
-    },
-    items: [
-      {
-        id: "1",
-        partNumber: "GIMBAL-Z30",
-        name: "云台 Z30",
-        quantity: 3,
-        unitPrice: 8500,
-        estimatedPrice: 25500,
-        supplier: "雷霆航空器材有限公司",
-        reason: "年度设备更新计划",
-      },
-      {
-        id: "2",
-        partNumber: "CAM-Z30",
-        name: "相机模组 Z30",
-        quantity: 2,
-        unitPrice: 12000,
-        estimatedPrice: 24000,
-        supplier: "雷霆航空器材有限公司",
-        reason: "年度设备更新计划",
-      },
-    ],
-    totalEstimated: 49500,
-    currency: "CNY",
-    justification: "根据2025年设备更新计划，需采购5台新设备替换老旧设备",
-    approvedBy: {
-      id: "U-003",
-      name: "王主管",
-      role: "MANAGER",
-    },
-    approvedAt: "2025-01-12T14:30:00",
-    rejectionReason: null,
-    purchaseOrderId: "PO-2025-0140",
-    attachments: [
-      { id: "1", name: "采购计划.pdf", type: "PDF", size: "256KB" },
-      { id: "2", name: "设备清单.xlsx", type: "Excel", size: "45KB" },
-    ],
-    createdAt: "2025-01-12T09:15:00",
-    updatedAt: "2025-01-13T10:00:00",
-  },
-  {
-    id: "PR-2025-0186",
-    title: "维修工具补充",
-    requestDate: "2025-01-10T11:00:00",
-    requiredDate: "2025-01-25T00:00:00",
-    status: "REJECTED",
-    priority: "LOW",
-    requestType: "STOCK",
-    requestedBy: {
-      id: "U-005",
-      name: "孙工",
-      department: "维修部",
-    },
-    items: [
-      {
-        id: "1",
-        partNumber: "TOOL-SET-01",
-        name: "维修工具套装",
-        quantity: 2,
-        unitPrice: 1500,
-        estimatedPrice: 3000,
-        supplier: "通用五金店",
-        reason: "补充工具库存",
-      },
-    ],
-    totalEstimated: 3000,
-    currency: "CNY",
-    justification: "现有工具损坏，需要补充",
-    approvedBy: {
-      id: "U-003",
-      name: "王主管",
-      role: "MANAGER",
-    },
-    approvedAt: "2025-01-10T15:30:00",
-    rejectionReason: "现有工具库存充足，暂不采购。请先申请工具维修。",
-    purchaseOrderId: null,
-    attachments: [],
-    createdAt: "2025-01-10T11:00:00",
-    updatedAt: "2025-01-10T15:30:00",
-  },
-  {
-    id: "PR-2025-0185",
-    title: "电机故障件采购",
-    requestDate: "2025-01-08T16:45:00",
-    requiredDate: "2025-01-18T00:00:00",
-    status: "COMPLETED",
-    priority: "HIGH",
-    requestType: "REPAIR",
-    requestedBy: {
-      id: "U-002",
-      name: "张维修",
-      department: "维修部",
-    },
-    items: [
-      {
-        id: "1",
-        partNumber: "MOTOR-M350-01",
-        name: "电机 M350",
-        quantity: 3,
-        unitPrice: 1200,
-        estimatedPrice: 3600,
-        supplier: "大疆创新科技有限公司",
-        reason: "更换故障电机",
-      },
-    ],
-    totalEstimated: 3600,
-    currency: "CNY",
-    justification: "3台电机在维修中发现故障，需要更换",
-    approvedBy: {
-      id: "U-003",
-      name: "王主管",
-      role: "MANAGER",
-    },
-    approvedAt: "2025-01-08T17:30:00",
-    rejectionReason: null,
-    purchaseOrderId: "PO-2025-0138",
-    attachments: [],
-    createdAt: "2025-01-08T16:45:00",
-    updatedAt: "2025-01-15T10:00:00",
-  },
-];
+// TODO: Import purchase request service when API is implemented
+// import { purchaseRequestService } from '@/services/purchase-request.service';
+
+// Purchase request type definition
+interface PurchaseRequestItem {
+  id: string;
+  partNumber: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  estimatedPrice: number;
+  supplier: string;
+  reason: string;
+}
+
+interface PurchaseRequestAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: string;
+}
+
+interface PurchaseRequest {
+  id: string;
+  title: string;
+  requestDate: string;
+  requiredDate: string;
+  status: string;
+  priority: string;
+  requestType: string;
+  requestedBy: {
+    id: string;
+    name: string;
+    department: string;
+  };
+  items: PurchaseRequestItem[];
+  totalEstimated: number;
+  currency: string;
+  justification: string;
+  approvedBy: {
+    id: string;
+    name: string;
+    role: string;
+  } | null;
+  approvedAt: string | null;
+  rejectionReason: string | null;
+  purchaseOrderId: string | null;
+  attachments: PurchaseRequestAttachment[];
+  createdAt: string;
+  updatedAt: string;
+}
 
 const STATUS_CONFIG = {
   DRAFT: {
@@ -300,12 +138,39 @@ export function PurchaseRequestsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("ALL");
   const [selectedPriority, setSelectedPriority] = useState("ALL");
-  const [selectedRequest, setSelectedRequest] = useState<typeof MOCK_REQUESTS[0] | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<PurchaseRequest | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [showNewRequestDialog, setShowNewRequestDialog] = useState(false);
 
-  const filteredRequests = MOCK_REQUESTS.filter((request) => {
+  // TODO: Replace with actual API call when purchase request service is implemented
+  const [requests, setRequests] = useState<PurchaseRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // TODO: Implement actual API call to fetch purchase requests
+    // Example:
+    // const fetchRequests = async () => {
+    //   try {
+    //     setLoading(true);
+    //     const data = await purchaseRequestService.getAll();
+    //     setRequests(data);
+    //   } catch (error) {
+    //     console.error('Failed to fetch purchase requests:', error);
+    //   } finally {
+    //     setLoading(false);
+    //   }
+    // };
+    // fetchRequests();
+
+    // Simulate loading completion with empty data
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const filteredRequests = requests.filter((request) => {
     const matchesSearch =
       request.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -315,17 +180,17 @@ export function PurchaseRequestsPage() {
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  const handleViewDetail = (request: typeof MOCK_REQUESTS[0]) => {
+  const handleViewDetail = (request: PurchaseRequest) => {
     setSelectedRequest(request);
     setShowDetailDialog(true);
   };
 
-  const handleApprove = (request: typeof MOCK_REQUESTS[0]) => {
+  const handleApprove = (request: PurchaseRequest) => {
     setSelectedRequest(request);
     setShowApprovalDialog(true);
   };
 
-  const handleReject = (request: typeof MOCK_REQUESTS[0]) => {
+  const handleReject = (request: PurchaseRequest) => {
     setSelectedRequest(request);
     // TODO: Implement reject with reason
     console.log("Reject request:", request.id);
@@ -369,7 +234,7 @@ export function PurchaseRequestsPage() {
             <div>
               <p className="text-sm text-slate-500">待审批</p>
               <p className="text-xl font-bold text-slate-900">
-                {MOCK_REQUESTS.filter((r) => r.status === "PENDING_APPROVAL").length}
+                {requests.filter((r) => r.status === "PENDING_APPROVAL").length}
               </p>
             </div>
           </div>
@@ -382,7 +247,7 @@ export function PurchaseRequestsPage() {
             <div>
               <p className="text-sm text-slate-500">已批准</p>
               <p className="text-xl font-bold text-slate-900">
-                {MOCK_REQUESTS.filter((r) => r.status === "APPROVED").length}
+                {requests.filter((r) => r.status === "APPROVED").length}
               </p>
             </div>
           </div>
@@ -395,7 +260,7 @@ export function PurchaseRequestsPage() {
             <div>
               <p className="text-sm text-slate-500">已采购</p>
               <p className="text-xl font-bold text-slate-900">
-                {MOCK_REQUESTS.filter((r) => r.status === "PURCHASED").length}
+                {requests.filter((r) => r.status === "PURCHASED").length}
               </p>
             </div>
           </div>
@@ -408,7 +273,7 @@ export function PurchaseRequestsPage() {
             <div>
               <p className="text-sm text-slate-500">已拒绝</p>
               <p className="text-xl font-bold text-slate-900">
-                {MOCK_REQUESTS.filter((r) => r.status === "REJECTED").length}
+                {requests.filter((r) => r.status === "REJECTED").length}
               </p>
             </div>
           </div>
@@ -421,7 +286,7 @@ export function PurchaseRequestsPage() {
             <div>
               <p className="text-sm text-slate-500">本月申请</p>
               <p className="text-xl font-bold text-slate-900">
-                {MOCK_REQUESTS.filter(
+                {requests.filter(
                   (r) => new Date(r.requestDate).getMonth() === new Date().getMonth()
                 ).length}
               </p>
@@ -473,145 +338,166 @@ export function PurchaseRequestsPage() {
       </div>
 
       {/* Request List */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  申请号
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  标题
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  申请人
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  申请日期
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  预计金额
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  状态
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  优先级
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
-              {filteredRequests.map((request) => {
-                const statusConfig = getStatusConfig(request.status as keyof typeof STATUS_CONFIG);
-                const StatusIcon = statusConfig.icon;
-                const priorityConfig = getPriorityConfig(request.priority as keyof typeof PRIORITY_CONFIG);
-                const typeConfig = getRequestTypeConfig(request.requestType as keyof typeof REQUEST_TYPE_CONFIG);
-
-                return (
-                  <tr key={request.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-medium text-slate-900">{request.id}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="font-medium text-slate-900">{request.title}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className={`text-xs px-2 py-0.5 rounded ${typeConfig.color}`}>
-                            {typeConfig.label}
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            {request.items.length} 项物品
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-slate-400" />
-                        <div>
-                          <p className="text-sm text-slate-900">{request.requestedBy.name}</p>
-                          <p className="text-xs text-slate-500">{request.requestedBy.department}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                      {new Date(request.requestDate).toLocaleDateString("zh-CN")}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <p className="text-sm font-medium text-slate-900">
-                        ¥{request.totalEstimated.toLocaleString()}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 text-xs font-medium rounded flex items-center gap-1 ${statusConfig.color}`}
-                      >
-                        <StatusIcon className="w-3 h-3" />
-                        {statusConfig.label}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 text-xs font-medium rounded ${priorityConfig.color}`}
-                      >
-                        {priorityConfig.label}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => handleViewDetail(request)}
-                          className="p-1.5 hover:bg-slate-100 rounded"
-                          title="查看详情"
-                        >
-                          <Eye className="w-4 h-4 text-slate-600" />
-                        </button>
-                        {request.status === "PENDING_APPROVAL" && (
-                          <>
-                            <button
-                              onClick={() => handleApprove(request)}
-                              className="p-1.5 hover:bg-green-100 rounded"
-                              title="批准"
-                            >
-                              <CheckCircle className="w-4 h-4 text-green-600" />
-                            </button>
-                            <button
-                              onClick={() => handleReject(request)}
-                              className="p-1.5 hover:bg-red-100 rounded"
-                              title="拒绝"
-                            >
-                              <XCircle className="w-4 h-4 text-red-600" />
-                            </button>
-                          </>
-                        )}
-                        {request.purchaseOrderId && (
-                          <Link
-                            to={`/purchase-orders/${request.purchaseOrderId}`}
-                            className="p-1.5 hover:bg-blue-100 rounded"
-                            title="查看采购订单"
-                          >
-                            <ShoppingCart className="w-4 h-4 text-blue-600" />
-                          </Link>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {loading ? (
+        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+          <Loader2 className="w-12 h-12 text-blue-500 mx-auto mb-4 animate-spin" />
+          <p className="text-slate-500">加载采购请求数据中...</p>
         </div>
-      </div>
-
-      {filteredRequests.length === 0 && (
+      ) : requests.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
           <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-          <p className="text-slate-500">没有找到匹配的采购申请</p>
+          <p className="text-slate-500 mb-4">暂无采购请求数据，请点击新增按钮创建采购请求</p>
+          <button
+            onClick={() => setShowNewRequestDialog(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            <Plus className="w-4 h-4" />
+            <span>新建申请</span>
+          </button>
         </div>
+      ) : (
+        <>
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      申请号
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      标题
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      申请人
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      申请日期
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      预计金额
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      状态
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      优先级
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      操作
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-slate-200">
+                  {filteredRequests.map((request) => {
+                    const statusConfig = getStatusConfig(request.status as keyof typeof STATUS_CONFIG);
+                    const StatusIcon = statusConfig.icon;
+                    const priorityConfig = getPriorityConfig(request.priority as keyof typeof PRIORITY_CONFIG);
+                    const typeConfig = getRequestTypeConfig(request.requestType as keyof typeof REQUEST_TYPE_CONFIG);
+
+                    return (
+                      <tr key={request.id} className="hover:bg-slate-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="font-medium text-slate-900">{request.id}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div>
+                            <p className="font-medium text-slate-900">{request.title}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className={`text-xs px-2 py-0.5 rounded ${typeConfig.color}`}>
+                                {typeConfig.label}
+                              </span>
+                              <span className="text-xs text-slate-500">
+                                {request.items.length} 项物品
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-slate-400" />
+                            <div>
+                              <p className="text-sm text-slate-900">{request.requestedBy.name}</p>
+                              <p className="text-xs text-slate-500">{request.requestedBy.department}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                          {new Date(request.requestDate).toLocaleDateString("zh-CN")}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <p className="text-sm font-medium text-slate-900">
+                            ¥{request.totalEstimated.toLocaleString()}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`px-2 py-1 text-xs font-medium rounded flex items-center gap-1 ${statusConfig.color}`}
+                          >
+                            <StatusIcon className="w-3 h-3" />
+                            {statusConfig.label}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`px-2 py-1 text-xs font-medium rounded ${priorityConfig.color}`}
+                          >
+                            {priorityConfig.label}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => handleViewDetail(request)}
+                              className="p-1.5 hover:bg-slate-100 rounded"
+                              title="查看详情"
+                            >
+                              <Eye className="w-4 h-4 text-slate-600" />
+                            </button>
+                            {request.status === "PENDING_APPROVAL" && (
+                              <>
+                                <button
+                                  onClick={() => handleApprove(request)}
+                                  className="p-1.5 hover:bg-green-100 rounded"
+                                  title="批准"
+                                >
+                                  <CheckCircle className="w-4 h-4 text-green-600" />
+                                </button>
+                                <button
+                                  onClick={() => handleReject(request)}
+                                  className="p-1.5 hover:bg-red-100 rounded"
+                                  title="拒绝"
+                                >
+                                  <XCircle className="w-4 h-4 text-red-600" />
+                                </button>
+                              </>
+                            )}
+                            {request.purchaseOrderId && (
+                              <Link
+                                to={`/purchase-orders/${request.purchaseOrderId}`}
+                                className="p-1.5 hover:bg-blue-100 rounded"
+                                title="查看采购订单"
+                              >
+                                <ShoppingCart className="w-4 h-4 text-blue-600" />
+                              </Link>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {filteredRequests.length === 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+              <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500">没有找到匹配的采购申请</p>
+            </div>
+          )}
+        </>
       )}
 
       {/* Detail Dialog */}
