@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
-  Plus,
   Wrench,
   Save,
   X,
@@ -9,6 +8,7 @@ import {
   Calendar,
   FileText,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
 
 import { Button } from "./ui/button";
@@ -30,14 +30,15 @@ import {
   SelectValue,
 } from "./ui/select";
 import { AircraftStatusBadge } from "./common/status-badge";
+import { fullAircraftService, Aircraft } from "../services/fleet.service";
 
-// Mock aircraft data
-const MOCK_AIRCRAFT = [
-  { id: "ac-001", registration: "B-7011U", status: "SERVICEABLE", model: "DJI Matrice 350 RTK" },
-  { id: "ac-002", registration: "B-7012U", status: "SERVICEABLE", model: "DJI Matrice 350 RTK" },
-  { id: "ac-003", registration: "B-7013U", status: "MAINTENANCE", model: "DJI Matrice 300 RTK" },
-  { id: "ac-004", registration: "B-7014U", status: "GROUNDED", model: "DJI Matrice 350 RTK" },
-];
+// Status mapping for display (API status -> Display status)
+const STATUS_MAP: Record<string, string> = {
+  AVAILABLE: "SERVICEABLE",
+  IN_MAINTENANCE: "MAINTENANCE",
+  AOG: "GROUNDED",
+  RETIRED: "RETIRED",
+};
 
 // Install position options based on component type
 const POSITION_OPTIONS_BY_TYPE: Record<string, string[]> = {
@@ -88,12 +89,25 @@ export function InstallComponentDialog({
   const [technician, setTechnician] = useState("");
   const [reason, setReason] = useState("新件装机");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [aircraftList, setAircraftList] = useState<Aircraft[]>([]);
+  const [isLoadingAircraft, setIsLoadingAircraft] = useState(false);
+
+  // Load aircraft list when dialog opens
+  useEffect(() => {
+    if (open && aircraftList.length === 0) {
+      setIsLoadingAircraft(true);
+      fullAircraftService.list(100)
+        .then(setAircraftList)
+        .catch((err) => console.error("Failed to load aircraft:", err))
+        .finally(() => setIsLoadingAircraft(false));
+    }
+  }, [open, aircraftList.length]);
 
   const positionOptions = component
     ? POSITION_OPTIONS_BY_TYPE[component.type] || POSITION_OPTIONS_BY_TYPE.OTHER
     : POSITION_OPTIONS_BY_TYPE.OTHER;
 
-  const selectedAircraft = MOCK_AIRCRAFT.find((a) => a.id === aircraftId);
+  const selectedAircraft = aircraftList.find((a) => a.id === aircraftId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,22 +185,31 @@ export function InstallComponentDialog({
               <Label htmlFor="aircraft" className="required">
                 装机飞机 *
               </Label>
-              <Select value={aircraftId} onValueChange={setAircraftId}>
+              <Select value={aircraftId} onValueChange={setAircraftId} disabled={isLoadingAircraft}>
                 <SelectTrigger id="aircraft">
-                  <SelectValue placeholder="选择目标飞机" />
+                  <SelectValue placeholder={isLoadingAircraft ? "加载中..." : "选择目标飞机"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {MOCK_AIRCRAFT.map((aircraft) => (
-                    <SelectItem key={aircraft.id} value={aircraft.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{aircraft.registration}</span>
-                        <span className="text-xs text-slate-500">
-                          {aircraft.model}
-                        </span>
-                        <AircraftStatusBadge status={aircraft.status as "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED"} />
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {isLoadingAircraft ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+                    </div>
+                  ) : (
+                    aircraftList.map((aircraft) => {
+                      const displayStatus = STATUS_MAP[aircraft.status] || aircraft.status;
+                      return (
+                        <SelectItem key={aircraft.id} value={aircraft.id}>
+                          <div className="flex items-center gap-2">
+                            <span>{aircraft.registrationNumber}</span>
+                            <span className="text-xs text-slate-500">
+                              {aircraft.model}
+                            </span>
+                            <AircraftStatusBadge status={displayStatus as "RETIRED" | "SERVICEABLE" | "MAINTENANCE" | "GROUNDED"} />
+                          </div>
+                        </SelectItem>
+                      );
+                    })
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -254,7 +277,7 @@ export function InstallComponentDialog({
             </div>
 
             {/* Warning if aircraft is grounded */}
-            {selectedAircraft?.status === "GROUNDED" && (
+            {selectedAircraft?.status === "AOG" && (
               <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-amber-800">
                 <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
                 <div className="text-sm">

@@ -384,6 +384,57 @@ describe('InventoryMovementService', () => {
       expect(result.status).toBe('COMPLETED');
       expect(inventoryRepo.updateQuantity).not.toHaveBeenCalled();
     });
+
+    it('should complete adjustment movement and set quantity', async () => {
+      const approvedMovement = {
+        ...mockMovement,
+        status: 'APPROVED',
+        type: 'ADJUSTMENT',
+        quantity: 10,
+      };
+      movementRepo.findById.mockResolvedValue(approvedMovement);
+      inventoryRepo.findById.mockResolvedValue(mockInventoryItem);
+      inventoryRepo.updateQuantity.mockResolvedValue({ ...mockInventoryItem });
+      movementRepo.update.mockResolvedValue({ ...approvedMovement, status: 'COMPLETED' });
+
+      const result = await service.complete('movement-123');
+
+      expect(result.status).toBe('COMPLETED');
+      expect(inventoryRepo.updateQuantity).toHaveBeenCalledWith('item-123', 10, 0);
+    });
+
+    it('should complete count movement and set quantity', async () => {
+      const approvedMovement = {
+        ...mockMovement,
+        status: 'APPROVED',
+        type: 'COUNT',
+        quantity: 95,
+      };
+      movementRepo.findById.mockResolvedValue(approvedMovement);
+      inventoryRepo.findById.mockResolvedValue(mockInventoryItem);
+      inventoryRepo.updateQuantity.mockResolvedValue({ ...mockInventoryItem });
+      movementRepo.update.mockResolvedValue({ ...approvedMovement, status: 'COMPLETED' });
+
+      const result = await service.complete('movement-123');
+
+      expect(result.status).toBe('COMPLETED');
+      expect(inventoryRepo.updateQuantity).toHaveBeenCalledWith('item-123', 95, 0);
+    });
+
+    it('should complete transfer movement without inventory update', async () => {
+      const approvedMovement = {
+        ...mockMovement,
+        status: 'APPROVED',
+        type: 'TRANSFER',
+      };
+      movementRepo.findById.mockResolvedValue(approvedMovement);
+      movementRepo.update.mockResolvedValue({ ...approvedMovement, status: 'COMPLETED' });
+
+      const result = await service.complete('movement-123');
+
+      expect(result.status).toBe('COMPLETED');
+      expect(inventoryRepo.updateQuantity).not.toHaveBeenCalled();
+    });
   });
 
   describe('cancel', () => {

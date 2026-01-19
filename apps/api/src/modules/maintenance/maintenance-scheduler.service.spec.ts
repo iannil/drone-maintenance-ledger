@@ -207,6 +207,39 @@ describe('MaintenanceSchedulerService', () => {
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0]).toContain('Scheduler run failed');
     });
+
+    it('should handle per-aircraft processing errors', async () => {
+      aircraftRepo.list.mockResolvedValue([mockAircraft]);
+      scheduleRepo.findByAircraftId.mockRejectedValue(new Error('Schedule fetch error'));
+
+      const result = await service.runScheduler();
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain('Error processing aircraft');
+    });
+
+    it('should skip COMPLETED and SKIPPED schedules', async () => {
+      const completedSchedule = { ...mockSchedule, status: 'COMPLETED' };
+      aircraftRepo.list.mockResolvedValue([mockAircraft]);
+      scheduleRepo.findByAircraftId.mockResolvedValue([completedSchedule]);
+
+      const result = await service.runScheduler();
+
+      expect(result.schedulesProcessed).toBe(1);
+      expect(result.alerts).toHaveLength(0);
+      expect(triggerRepo.findById).not.toHaveBeenCalled();
+    });
+
+    it('should skip inactive triggers', async () => {
+      const inactiveTrigger = { ...mockTrigger, isActive: false };
+      aircraftRepo.list.mockResolvedValue([mockAircraft]);
+      scheduleRepo.findByAircraftId.mockResolvedValue([mockSchedule]);
+      triggerRepo.findById.mockResolvedValue(inactiveTrigger);
+
+      const result = await service.runScheduler();
+
+      expect(result.alerts).toHaveLength(0);
+    });
   });
 
   describe('createWorkOrdersForDueSchedules', () => {
@@ -274,6 +307,71 @@ describe('MaintenanceSchedulerService', () => {
       expect(result).toHaveLength(0);
       expect(workOrderRepo.create).not.toHaveBeenCalled();
     });
+
+    it('should handle work order creation errors gracefully', async () => {
+      const dueSchedule = { ...mockSchedule, status: 'DUE' };
+      scheduleRepo.findDueWithoutWorkOrder.mockResolvedValue([dueSchedule]);
+      triggerRepo.findById.mockResolvedValue(mockTrigger);
+      aircraftRepo.findById.mockResolvedValue(mockAircraft);
+      workOrderRepo.generateOrderNumber.mockResolvedValue('WO-2024-001');
+      workOrderRepo.create.mockRejectedValue(new Error('Database error'));
+
+      const result = await service.createWorkOrdersForDueSchedules();
+
+      // Should return empty array on error (error is logged but doesn't throw)
+      expect(result).toHaveLength(0);
+    });
+
+    it('should create work orders with autoAssign parameter (not yet implemented)', async () => {
+      const dueSchedule = { ...mockSchedule, status: 'DUE' };
+      const mockWorkOrder = {
+        id: 'wo-123',
+        orderNumber: 'WO-2024-001',
+        title: 'Engine Inspection - N12345',
+        aircraftId: mockAircraft.id,
+        type: 'SCHEDULED',
+        status: 'PENDING',
+        priority: 'MEDIUM',
+        description: null,
+        reason: null,
+        assignedTo: null,
+        assignedAt: null,
+        scheduledStart: null,
+        scheduledEnd: null,
+        actualStart: null,
+        actualEnd: null,
+        aircraftHours: null,
+        aircraftCycles: null,
+        completedBy: null,
+        completedAt: null,
+        releasedBy: null,
+        releasedAt: null,
+        completionNotes: null,
+        discrepancies: null,
+        scheduleId: dueSchedule.id,
+        isActive: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      scheduleRepo.findDueWithoutWorkOrder.mockResolvedValue([dueSchedule]);
+      triggerRepo.findById.mockResolvedValue(mockTrigger);
+      aircraftRepo.findById.mockResolvedValue(mockAircraft);
+      workOrderRepo.generateOrderNumber.mockResolvedValue('WO-2024-001');
+      workOrderRepo.create.mockResolvedValue(mockWorkOrder);
+      scheduleRepo.update.mockResolvedValue({ ...dueSchedule, workOrderId: 'wo-123' });
+
+      const result = await service.createWorkOrdersForDueSchedules(true);
+
+      expect(result).toHaveLength(1);
+      // Note: autoAssign parameter exists but is not yet implemented
+      // The work order is created with PENDING status regardless
+      expect(workOrderRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'PENDING',
+        }),
+      );
+    });
   });
 
   describe('initializeAircraftSchedules', () => {
@@ -317,6 +415,16 @@ describe('MaintenanceSchedulerService', () => {
 
       expect(result).toHaveLength(0);
     });
+
+    it('should return empty array when program has no triggers', async () => {
+      aircraftRepo.findById.mockResolvedValue(mockAircraft);
+      programRepo.findDefaultForModel.mockResolvedValue(mockProgram);
+      triggerRepo.findByProgramId.mockResolvedValue([]);
+
+      const result = await service.initializeAircraftSchedules('aircraft-123');
+
+      expect(result).toHaveLength(0);
+    });
   });
 
   describe('completeSchedule', () => {
@@ -347,6 +455,37 @@ describe('MaintenanceSchedulerService', () => {
 
       await expect(service.completeSchedule('non-existent')).rejects.toThrow(
         'Schedule non-existent not found',
+      );
+    });
+
+    it('should throw error when aircraft not found', async () => {
+      scheduleRepo.findById.mockResolvedValue(mockSchedule);
+      aircraftRepo.findById.mockResolvedValue(null);
+
+      await expect(service.completeSchedule('schedule-123')).rejects.toThrow(
+        'Aircraft aircraft-123 not found',
+      );
+    });
+
+    it('should handle FLIGHT_CYCLES trigger type', async () => {
+      const cyclesTrigger = { ...mockTrigger, type: 'FLIGHT_CYCLES' };
+      scheduleRepo.findById.mockResolvedValue(mockSchedule);
+      aircraftRepo.findById.mockResolvedValue(mockAircraft);
+      triggerRepo.findById.mockResolvedValue(cyclesTrigger);
+      calcService.calculateTrigger.mockReturnValue(mockCalcResult);
+      scheduleRepo.update.mockResolvedValue({ ...mockSchedule, status: 'COMPLETED' });
+      scheduleRepo.create.mockResolvedValue({
+        ...mockSchedule,
+        id: 'new-schedule-123',
+        status: 'SCHEDULED',
+      });
+
+      const result = await service.completeSchedule('schedule-123', undefined);
+
+      expect(result.status).toBe('COMPLETED');
+      expect(scheduleRepo.update).toHaveBeenCalledWith(
+        'schedule-123',
+        expect.objectContaining({ lastCompletedAtValue: mockAircraft.totalFlightCycles }),
       );
     });
   });
@@ -404,6 +543,71 @@ describe('MaintenanceSchedulerService', () => {
 
       expect(result.length).toBeGreaterThan(0);
       expect(result[0]!.type).toBe('OVERDUE');
+    });
+
+    it('should skip COMPLETED and SKIPPED schedules', async () => {
+      const completedSchedule = { ...mockSchedule, status: 'COMPLETED' };
+      aircraftRepo.list.mockResolvedValue([mockAircraft]);
+      scheduleRepo.findByAircraftId.mockResolvedValue([completedSchedule]);
+
+      const result = await service.getAlerts();
+
+      expect(result).toHaveLength(0);
+      expect(triggerRepo.findById).not.toHaveBeenCalled();
+    });
+
+    it('should count status updates correctly', async () => {
+      const overdueCalcResult: TriggerCalculationResult = {
+        ...mockCalcResult,
+        status: 'OVERDUE',
+      };
+
+      aircraftRepo.list.mockResolvedValue([mockAircraft]);
+      scheduleRepo.findByAircraftId.mockResolvedValue([mockSchedule]);
+      triggerRepo.findById.mockResolvedValue(mockTrigger);
+      calcService.calculateTrigger.mockReturnValue(overdueCalcResult);
+
+      const result = await service.runScheduler();
+
+      expect(result.statusUpdates.toOverdue).toBe(1);
+      expect(result.alerts.length).toBe(1);
+    });
+
+    it('should count DUE status updates', async () => {
+      const dueCalcResult: TriggerCalculationResult = {
+        ...mockCalcResult,
+        status: 'DUE',
+      };
+
+      aircraftRepo.list.mockResolvedValue([mockAircraft]);
+      scheduleRepo.findByAircraftId.mockResolvedValue([mockSchedule]);
+      triggerRepo.findById.mockResolvedValue(mockTrigger);
+      calcService.calculateTrigger.mockReturnValue(dueCalcResult);
+
+      const result = await service.runScheduler();
+
+      expect(result.statusUpdates.toDue).toBe(1);
+    });
+
+    it('should handle multiple status updates in one run', async () => {
+      const mockSchedules = [
+        { ...mockSchedule, id: 'schedule-1' },
+        { ...mockSchedule, id: 'schedule-2' },
+      ];
+
+      aircraftRepo.list.mockResolvedValue([mockAircraft]);
+      scheduleRepo.findByAircraftId.mockResolvedValue(mockSchedules);
+      triggerRepo.findById.mockResolvedValue(mockTrigger);
+
+      // Return different statuses for each schedule
+      calcService.calculateTrigger
+        .mockReturnValueOnce({ ...mockCalcResult, status: 'DUE' } as TriggerCalculationResult)
+        .mockReturnValueOnce({ ...mockCalcResult, status: 'OVERDUE' } as TriggerCalculationResult);
+
+      const result = await service.runScheduler();
+
+      expect(result.statusUpdates.toDue).toBe(1);
+      expect(result.statusUpdates.toOverdue).toBe(1);
     });
   });
 });

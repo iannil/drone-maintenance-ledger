@@ -13,6 +13,7 @@ export * from "./core/component-installation";
 
 // Maintenance
 export * from "./maintenance/maintenance-program";
+export { MaintenanceTriggerTypeEnum } from "./maintenance/maintenance-program";
 export * from "./maintenance/maintenance-trigger";
 export * from "./maintenance/maintenance-schedule";
 export * from "./maintenance/maintenance-history";

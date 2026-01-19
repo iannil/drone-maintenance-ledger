@@ -7,7 +7,15 @@
 import { Injectable } from "@nestjs/common";
 
 import type { MaintenanceTrigger, Aircraft, Component } from "@repo/db";
-import { MaintenanceTriggerTypeEnum } from "@repo/db";
+
+// Trigger type constants (matching the database values)
+const TRIGGER_TYPES = {
+  CALENDAR_DAYS: "CALENDAR_DAYS",
+  FLIGHT_HOURS: "FLIGHT_HOURS",
+  FLIGHT_CYCLES: "FLIGHT_CYCLES",
+  BATTERY_CYCLES: "BATTERY_CYCLES",
+  CALENDAR_DATE: "CALENDAR_DATE",
+} as const;
 
 /**
  * Calculation result
@@ -52,19 +60,19 @@ export class TriggerCalculationService {
     const { aircraft, component, lastCompletedAt, lastCompletedAtValue } = context;
 
     switch (trigger.type) {
-      case MaintenanceTriggerTypeEnum.CALENDAR_DAYS:
+      case TRIGGER_TYPES.CALENDAR_DAYS:
         return this.calculateCalendarDays(trigger, lastCompletedAt);
 
-      case MaintenanceTriggerTypeEnum.FLIGHT_HOURS:
+      case TRIGGER_TYPES.FLIGHT_HOURS:
         return this.calculateFlightHours(trigger, aircraft, lastCompletedAtValue);
 
-      case MaintenanceTriggerTypeEnum.FLIGHT_CYCLES:
+      case TRIGGER_TYPES.FLIGHT_CYCLES:
         return this.calculateFlightCycles(trigger, aircraft, lastCompletedAtValue);
 
-      case MaintenanceTriggerTypeEnum.BATTERY_CYCLES:
+      case TRIGGER_TYPES.BATTERY_CYCLES:
         return this.calculateBatteryCycles(trigger, component, lastCompletedAtValue);
 
-      case MaintenanceTriggerTypeEnum.CALENDAR_DATE:
+      case TRIGGER_TYPES.CALENDAR_DATE:
         return this.calculateCalendarDate(trigger);
 
       default:

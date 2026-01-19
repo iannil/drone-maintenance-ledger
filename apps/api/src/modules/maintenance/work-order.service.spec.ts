@@ -247,6 +247,12 @@ describe('WorkOrderService', () => {
 
       await expect(service.updateStatus('wo-123', 'OPEN')).rejects.toThrow(ConflictException);
     });
+
+    it('should throw NotFoundException when work order not found', async () => {
+      workOrderRepo.findById.mockResolvedValue(null);
+
+      await expect(service.updateStatus('non-existent', 'OPEN')).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('assign', () => {
@@ -264,6 +270,12 @@ describe('WorkOrderService', () => {
       workOrderRepo.findById.mockResolvedValue({ ...mockWorkOrder, status: 'RELEASED' });
 
       await expect(service.assign('wo-123', 'user-123')).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw NotFoundException when work order not found', async () => {
+      workOrderRepo.findById.mockResolvedValue(null);
+
+      await expect(service.assign('non-existent', 'user-123')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -285,6 +297,12 @@ describe('WorkOrderService', () => {
 
       await expect(service.complete('wo-123', 'user-123')).rejects.toThrow(ConflictException);
     });
+
+    it('should throw NotFoundException when work order not found', async () => {
+      workOrderRepo.findById.mockResolvedValue(null);
+
+      await expect(service.complete('non-existent', 'user-123')).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('release', () => {
@@ -303,6 +321,12 @@ describe('WorkOrderService', () => {
 
       await expect(service.release('wo-123', 'inspector-123')).rejects.toThrow(ConflictException);
     });
+
+    it('should throw NotFoundException when work order not found', async () => {
+      workOrderRepo.findById.mockResolvedValue(null);
+
+      await expect(service.release('non-existent', 'inspector-123')).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('delete', () => {
@@ -318,6 +342,13 @@ describe('WorkOrderService', () => {
       workOrderRepo.findById.mockResolvedValue({ ...mockWorkOrder, status: 'IN_PROGRESS' });
 
       await expect(service.delete('wo-123')).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw NotFoundException when work order not found', async () => {
+      workOrderRepo.findById.mockResolvedValue(null);
+
+      await expect(service.delete('non-existent')).rejects.toThrow(NotFoundException);
+      await expect(service.delete('non-existent')).rejects.toThrow('Work order not found');
     });
   });
 
@@ -377,6 +408,13 @@ describe('WorkOrderService', () => {
 
       await expect(service.updateTaskStatus('task-123', 'COMPLETED')).rejects.toThrow(ConflictException);
     });
+
+    it('should throw NotFoundException when task not found', async () => {
+      taskRepo.findById.mockResolvedValue(null);
+
+      await expect(service.updateTaskStatus('non-existent', 'COMPLETED')).rejects.toThrow(NotFoundException);
+      await expect(service.updateTaskStatus('non-existent', 'COMPLETED')).rejects.toThrow('Task not found');
+    });
   });
 
   describe('signOffRiiTask', () => {
@@ -395,6 +433,13 @@ describe('WorkOrderService', () => {
       taskRepo.findById.mockResolvedValue(mockTask);
 
       await expect(service.signOffRiiTask('task-123', 'inspector-123')).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw NotFoundException when task not found', async () => {
+      taskRepo.findById.mockResolvedValue(null);
+
+      await expect(service.signOffRiiTask('non-existent', 'inspector-123')).rejects.toThrow(NotFoundException);
+      await expect(service.signOffRiiTask('non-existent', 'inspector-123')).rejects.toThrow('Task not found');
     });
   });
 
@@ -446,6 +491,255 @@ describe('WorkOrderService', () => {
       partRepo.findById.mockResolvedValue(null);
 
       await expect(service.deletePart('non-existent')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // Query Methods Tests
+  describe('findByAircraft', () => {
+    it('should return work orders for aircraft with default pagination', async () => {
+      workOrderRepo.findByAircraft.mockResolvedValue([mockWorkOrder]);
+
+      const result = await service.findByAircraft('aircraft-123');
+
+      expect(result).toEqual([mockWorkOrder]);
+      expect(workOrderRepo.findByAircraft).toHaveBeenCalledWith('aircraft-123', 50, 0);
+    });
+
+    it('should return work orders for aircraft with custom pagination', async () => {
+      workOrderRepo.findByAircraft.mockResolvedValue([mockWorkOrder]);
+
+      const result = await service.findByAircraft('aircraft-123', 10, 5);
+
+      expect(result).toEqual([mockWorkOrder]);
+      expect(workOrderRepo.findByAircraft).toHaveBeenCalledWith('aircraft-123', 10, 5);
+    });
+  });
+
+  describe('findByAssignee', () => {
+    it('should return work orders for assignee with default pagination', async () => {
+      workOrderRepo.findByAssignee.mockResolvedValue([mockWorkOrder]);
+
+      const result = await service.findByAssignee('user-123');
+
+      expect(result).toEqual([mockWorkOrder]);
+      expect(workOrderRepo.findByAssignee).toHaveBeenCalledWith('user-123', 50, 0);
+    });
+
+    it('should return work orders for assignee with custom pagination', async () => {
+      workOrderRepo.findByAssignee.mockResolvedValue([mockWorkOrder]);
+
+      const result = await service.findByAssignee('user-123', 10, 5);
+
+      expect(result).toEqual([mockWorkOrder]);
+      expect(workOrderRepo.findByAssignee).toHaveBeenCalledWith('user-123', 10, 5);
+    });
+  });
+
+  describe('findOpen', () => {
+    it('should return open work orders with default pagination', async () => {
+      const openOrders = [{ ...mockWorkOrder, status: 'OPEN' }];
+      workOrderRepo.findOpen.mockResolvedValue(openOrders as any);
+
+      const result = await service.findOpen();
+
+      expect(result).toEqual(openOrders);
+      expect(workOrderRepo.findOpen).toHaveBeenCalledWith(50, 0);
+    });
+
+    it('should return open work orders with custom pagination', async () => {
+      workOrderRepo.findOpen.mockResolvedValue([mockWorkOrder]);
+
+      const result = await service.findOpen(10, 5);
+
+      expect(result).toEqual([mockWorkOrder]);
+      expect(workOrderRepo.findOpen).toHaveBeenCalledWith(10, 5);
+    });
+  });
+
+  describe('findByStatus', () => {
+    it('should return work orders by status', async () => {
+      const inProgressOrders = [{ ...mockWorkOrder, status: 'IN_PROGRESS' }];
+      workOrderRepo.findByStatus.mockResolvedValue(inProgressOrders as any);
+
+      const result = await service.findByStatus('IN_PROGRESS');
+
+      expect(result).toEqual(inProgressOrders);
+      expect(workOrderRepo.findByStatus).toHaveBeenCalledWith('IN_PROGRESS', 50, 0);
+    });
+
+    it('should return work orders by status with custom pagination', async () => {
+      workOrderRepo.findByStatus.mockResolvedValue([mockWorkOrder]);
+
+      const result = await service.findByStatus('COMPLETED', 10, 5);
+
+      expect(result).toEqual([mockWorkOrder]);
+      expect(workOrderRepo.findByStatus).toHaveBeenCalledWith('COMPLETED', 10, 5);
+    });
+  });
+
+  describe('getRecent', () => {
+    it('should return recent work orders with default limit', async () => {
+      workOrderRepo.findRecent.mockResolvedValue([mockWorkOrder]);
+
+      const result = await service.getRecent();
+
+      expect(result).toEqual([mockWorkOrder]);
+      expect(workOrderRepo.findRecent).toHaveBeenCalledWith(20);
+    });
+
+    it('should return recent work orders with custom limit', async () => {
+      workOrderRepo.findRecent.mockResolvedValue([mockWorkOrder]);
+
+      const result = await service.getRecent(10);
+
+      expect(result).toEqual([mockWorkOrder]);
+      expect(workOrderRepo.findRecent).toHaveBeenCalledWith(10);
+    });
+  });
+
+  // Status Transition Tests
+  describe('start', () => {
+    it('should start work order successfully', async () => {
+      workOrderRepo.findById.mockResolvedValue({ ...mockWorkOrder, status: 'OPEN' });
+      workOrderRepo.start.mockResolvedValue({ ...mockWorkOrder, status: 'IN_PROGRESS' });
+
+      const result = await service.start('wo-123');
+
+      expect(result.status).toBe('IN_PROGRESS');
+      expect(workOrderRepo.start).toHaveBeenCalledWith('wo-123');
+    });
+
+    it('should throw NotFoundException when work order not found', async () => {
+      workOrderRepo.findById.mockResolvedValue(null);
+
+      await expect(service.start('non-existent')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ConflictException when starting released work order', async () => {
+      workOrderRepo.findById.mockResolvedValue({ ...mockWorkOrder, status: 'RELEASED' });
+
+      await expect(service.start('wo-123')).rejects.toThrow(ConflictException);
+      await expect(service.start('wo-123')).rejects.toThrow('Cannot start a released work order');
+    });
+  });
+
+  describe('cancel', () => {
+    it('should cancel work order successfully', async () => {
+      workOrderRepo.findById.mockResolvedValue({ ...mockWorkOrder, status: 'OPEN' });
+      workOrderRepo.updateStatus.mockResolvedValue({ ...mockWorkOrder, status: 'CANCELLED' });
+
+      const result = await service.cancel('wo-123');
+
+      expect(result.status).toBe('CANCELLED');
+      expect(workOrderRepo.updateStatus).toHaveBeenCalledWith('wo-123', 'CANCELLED');
+    });
+
+    it('should throw NotFoundException when work order not found', async () => {
+      workOrderRepo.findById.mockResolvedValue(null);
+
+      await expect(service.cancel('non-existent')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ConflictException when cancelling released work order', async () => {
+      workOrderRepo.findById.mockResolvedValue({ ...mockWorkOrder, status: 'RELEASED' });
+
+      await expect(service.cancel('wo-123')).rejects.toThrow(ConflictException);
+      await expect(service.cancel('wo-123')).rejects.toThrow('Cannot cancel a released work order');
+    });
+  });
+
+  // Task Management Additional Tests
+  describe('addTasks', () => {
+    const tasksDtos: AddTaskDto[] = [
+      { sequence: 1, title: 'Task 1', description: 'First task' },
+      { sequence: 2, title: 'Task 2', description: 'Second task' },
+    ];
+
+    it('should add multiple tasks to work order', async () => {
+      workOrderRepo.findById.mockResolvedValue(mockWorkOrder);
+      taskRepo.createMany.mockResolvedValue([mockTask, { ...mockTask, id: 'task-456' }] as any);
+
+      const result = await service.addTasks('wo-123', tasksDtos);
+
+      expect(result).toHaveLength(2);
+      expect(taskRepo.createMany).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ workOrderId: 'wo-123', status: 'PENDING' }),
+        ]),
+      );
+    });
+
+    it('should throw NotFoundException when work order not found', async () => {
+      workOrderRepo.findById.mockResolvedValue(null);
+
+      await expect(service.addTasks('non-existent', tasksDtos)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('updateTask', () => {
+    const updateDto = {
+      title: 'Updated Task',
+      description: 'Updated description',
+    };
+
+    it('should update task successfully', async () => {
+      taskRepo.findById.mockResolvedValue(mockTask);
+      taskRepo.update.mockResolvedValue({ ...mockTask, ...updateDto });
+
+      const result = await service.updateTask('task-123', updateDto);
+
+      expect(result.title).toBe('Updated Task');
+      expect(taskRepo.update).toHaveBeenCalledWith('task-123', updateDto);
+    });
+
+    it('should throw NotFoundException when task not found', async () => {
+      taskRepo.findById.mockResolvedValue(null);
+
+      await expect(service.updateTask('non-existent', updateDto)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('deleteTask', () => {
+    it('should delete task successfully', async () => {
+      taskRepo.findById.mockResolvedValue(mockTask);
+      taskRepo.delete.mockResolvedValue(undefined);
+
+      await expect(service.deleteTask('task-123')).resolves.toBeUndefined();
+      expect(taskRepo.delete).toHaveBeenCalledWith('task-123');
+    });
+
+    it('should throw NotFoundException when task not found', async () => {
+      taskRepo.findById.mockResolvedValue(null);
+
+      await expect(service.deleteTask('non-existent')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // Part Management Additional Tests
+  describe('addParts', () => {
+    const partsDtos = [
+      { partNumber: 'PN-001', partName: 'Part 1', quantity: 1, unit: 'EA' },
+      { partNumber: 'PN-002', partName: 'Part 2', quantity: 2, unit: 'EA' },
+    ];
+
+    it('should add multiple parts to work order', async () => {
+      workOrderRepo.findById.mockResolvedValue(mockWorkOrder);
+      partRepo.createMany.mockResolvedValue([mockPart, { ...mockPart, id: 'part-456' }] as any);
+
+      const result = await service.addParts('wo-123', partsDtos);
+
+      expect(result).toHaveLength(2);
+      expect(partRepo.createMany).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ workOrderId: 'wo-123' }),
+        ]),
+      );
+    });
+
+    it('should throw NotFoundException when work order not found', async () => {
+      workOrderRepo.findById.mockResolvedValue(null);
+
+      await expect(service.addParts('non-existent', partsDtos)).rejects.toThrow(NotFoundException);
     });
   });
 });

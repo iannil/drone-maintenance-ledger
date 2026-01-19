@@ -102,6 +102,25 @@ describe('UserController', () => {
       expect(result).toEqual(mockUsers);
       expect(userService.list).toHaveBeenCalledWith(10, 20);
     });
+
+    it('should use default values when parameters are not provided', async () => {
+      userService.list.mockResolvedValue(mockUsers as any);
+
+      // Call without parameters to trigger default values (undefined)
+      const result = await controller.list(undefined as any, undefined as any);
+
+      expect(result).toEqual(mockUsers);
+      expect(userService.list).toHaveBeenCalledWith(50, 0);
+    });
+
+    it('should use default offset when only limit is provided', async () => {
+      userService.list.mockResolvedValue(mockUsers as any);
+
+      const result = await controller.list(25, undefined as any);
+
+      expect(result).toEqual(mockUsers);
+      expect(userService.list).toHaveBeenCalledWith(25, 0);
+    });
   });
 
   describe('POST /users', () => {
