@@ -142,6 +142,30 @@ export interface Aircraft {
 }
 
 /**
+ * DTO for creating aircraft
+ */
+export interface CreateAircraftDto {
+  fleetId: string;
+  registrationNumber: string;
+  serialNumber: string;
+  model: string;
+  manufacturer: string;
+  status?: AircraftStatus;
+}
+
+/**
+ * DTO for updating aircraft
+ */
+export interface UpdateAircraftDto {
+  fleetId?: string;
+  registrationNumber?: string;
+  serialNumber?: string;
+  model?: string;
+  manufacturer?: string;
+  status?: AircraftStatus;
+}
+
+/**
  * Full aircraft service
  */
 export const fullAircraftService = {
@@ -168,5 +192,33 @@ export const fullAircraftService = {
     return api.get<FleetStatusCounts>("/aircraft/status/counts", {
       params: { fleetId },
     });
+  },
+
+  /**
+   * Create a new aircraft
+   */
+  create(dto: CreateAircraftDto): Promise<Aircraft> {
+    return api.post<Aircraft>("/aircraft", dto);
+  },
+
+  /**
+   * Update an aircraft
+   */
+  update(id: string, dto: UpdateAircraftDto): Promise<Aircraft> {
+    return api.put<Aircraft>(`/aircraft/${id}`, dto);
+  },
+
+  /**
+   * Update aircraft status
+   */
+  updateStatus(id: string, status: AircraftStatus): Promise<Aircraft> {
+    return api.put<Aircraft>(`/aircraft/${id}/status`, { status });
+  },
+
+  /**
+   * Delete an aircraft
+   */
+  delete(id: string): Promise<void> {
+    return api.delete(`/aircraft/${id}`);
   },
 };

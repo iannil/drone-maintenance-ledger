@@ -1,7 +1,8 @@
 # Sprint 11 进度报告 - Controller 层测试
 
 **日期**: 2026-01-19
-**状态**: 进行中
+**状态**: 已完成
+**完成报告**: [/docs/reports/completed/sprint-11-controller-testing-completed.md](../reports/completed/sprint-11-controller-testing-completed.md)
 
 ---
 
@@ -97,27 +98,27 @@ apps/api/src/modules/maintenance/
 
 ## 测试统计
 
-### 当前状态
+### 最终状态
 
 ```
-Test Suites: 21 passed, 21 total
-Tests:       397 passed, 397 total
+Test Suites: 43 passed, 43 total
+Tests:       908 passed, 908 total
 
 Coverage Summary:
-- Statements: 37.07%
-- Branches:   25.61%
-- Functions:  27.75%
-- Lines:      36.52%
+- Statements: 70.58%
+- Branches:   56.74%
+- Functions:  60.35%
+- Lines:      70.02%
 ```
 
 ### 与目标对比
 
-| 指标 | 目标 | 当前 | 差距 |
+| 指标 | 目标 | 当前 | 状态 |
 |------|------|------|------|
-| Statements | 70% | 37% | -33% |
-| Branches | 60% | 26% | -34% |
-| Functions | 70% | 28% | -42% |
-| Lines | 70% | 37% | -33% |
+| Statements | 70% | 70.58% | ✅ 达标 |
+| Branches | 60% | 56.74% | ⚠️ 接近 |
+| Functions | 70% | 60.35% | ⚠️ 接近 |
+| Lines | 70% | 70.02% | ✅ 达标 |
 
 ### Controller 测试覆盖
 
@@ -126,20 +127,20 @@ Coverage Summary:
 | Auth | 1 | 1 | 100% |
 | User | 1 | 1 | 100% |
 | Asset | 3 | 3 | 100% |
-| Flight | 3 | 2 | 67% |
+| Flight | 3 | 3 | 100% |
 | Maintenance | 2 | 2 | 100% |
-| Inventory | 6 | 0 | 0% |
-| Health | 1 | 0 | 0% |
-| Stats | 1 | 0 | 0% |
-| **总计** | **18** | **9** | **50%** |
+| Inventory | 6 | 6 | 100% |
+| Health | 1 | 1 | 100% |
+| Stats | 1 | 1 | 100% |
+| **总计** | **18** | **18** | **100%** |
 
 ---
 
-## 待完成工作
+## 已完成工作
 
-### 高优先级（提升至 70% 覆盖率）
+所有 Controller 测试已完成：
 
-1. **Inventory 模块 Controller 测试** (6 个)
+1. **Inventory 模块 Controller 测试** (6 个) ✅
    - InventoryItemController
    - InventoryMovementController
    - WarehouseController
@@ -147,15 +148,13 @@ Coverage Summary:
    - PurchaseRequestController
    - SupplierController
 
-2. **其他模块 Controller 测试** (3 个)
+2. **其他模块 Controller 测试** (3 个) ✅
    - HealthController
    - StatsController
    - ReleaseRecordController
 
-3. **Service 层测试补充**
-   - Asset 模块 Services
-   - Flight 模块 Services
-   - Maintenance 模块 Services
+3. **Service 层测试已达标** ✅
+   - 所有主要 Service 覆盖率 > 95%
 
 ---
 
@@ -215,9 +214,11 @@ pnpm --filter api test -- --coverage
 
 ## 下一步计划
 
-1. 继续 Inventory 模块 Controller 测试（提升覆盖率）
-2. 补充 Service 层单元测试
-3. 完成 Sprint 12：前端表单完善
+Sprint 11 已完成，后续工作：
+
+1. ✅ Sprint 11 Controller 层测试 - **已完成**
+2. ⏳ Sprint 12：前端表单完善
+3. ⏳ Sprint 13：PWA + 离线支持
 
 ---
 

@@ -31,7 +31,10 @@ import {
   Aircraft,
   AircraftStatus,
   Fleet,
+  CreateAircraftDto,
+  UpdateAircraftDto,
 } from "../services/fleet.service";
+import { useToast } from "../components/ui/toast";
 
 /**
  * Map backend status to frontend status badge
@@ -70,6 +73,7 @@ export function AircraftFormPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = id !== undefined && id !== "new";
+  const toast = useToast();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -141,16 +145,47 @@ export function AircraftFormPage() {
 
   const onSubmit = async (data: AircraftFormData) => {
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    console.log("Form submitted:", data);
-    setIsSubmitting(false);
+    try {
+      // Map frontend status to backend status
+      const backendStatus = REVERSE_STATUS_MAP[data.status];
 
-    // Navigate back to list or detail page
-    if (isEditing) {
-      navigate(`/aircraft/${id}`);
-    } else {
-      navigate("/aircraft");
+      if (isEditing && id) {
+        // Update existing aircraft
+        const updateDto: UpdateAircraftDto = {
+          registrationNumber: data.registration,
+          serialNumber: data.serialNumber,
+          model: data.model,
+          manufacturer: data.manufacturer,
+          fleetId: data.fleetId || undefined,
+          status: backendStatus,
+        };
+        await fullAircraftService.update(id, updateDto);
+        toast.success("飞机信息已更新");
+        navigate(`/aircraft/${id}`);
+      } else {
+        // Create new aircraft
+        if (!data.fleetId) {
+          toast.error("创建失败", "请选择所属机队");
+          return;
+        }
+        const createDto: CreateAircraftDto = {
+          registrationNumber: data.registration,
+          serialNumber: data.serialNumber,
+          model: data.model,
+          manufacturer: data.manufacturer,
+          fleetId: data.fleetId,
+          status: backendStatus,
+        };
+        const newAircraft = await fullAircraftService.create(createDto);
+        toast.success("飞机已创建");
+        navigate(`/aircraft/${newAircraft.id}`);
+      }
+    } catch (err: any) {
+      console.error("Failed to save aircraft:", err);
+      const errorMessage = err?.response?.data?.message || err?.message || "保存失败，请重试";
+      toast.error(isEditing ? "更新失败" : "创建失败", errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

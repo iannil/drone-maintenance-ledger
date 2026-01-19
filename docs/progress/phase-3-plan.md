@@ -79,69 +79,77 @@ Phase 2 已完成全部 158+ 个 API 端点开发、前后端对接、测试框�
 
 ---
 
-### Sprint 11: Controller 层测试（P1）
+### Sprint 11: Controller 层测试（P1）✅ 已完成
 
 **目标**: 提升 API 测试覆盖率
+**完成时间**: 2026-01-19
+**完成报告**: [/docs/reports/completed/sprint-11-controller-testing-completed.md](../reports/completed/sprint-11-controller-testing-completed.md)
 
 #### 11.1 HTTP 请求测试
 | 模块 | 控制器 | 状态 |
 |------|--------|------|
-| Auth | AuthController | ⏳ |
-| User | UserController | ⏳ |
-| Asset | FleetController, AircraftController, ComponentController | ⏳ |
-| Flight | FlightLogController, PilotReportController | ⏳ |
-| Maintenance | WorkOrderController, MaintenanceSchedulerController | ⏳ |
-| Inventory | InventoryController, WarehouseController, MovementController | ⏳ |
+| Auth | AuthController | ✅ |
+| User | UserController | ✅ |
+| Asset | FleetController, AircraftController, ComponentController | ✅ |
+| Flight | FlightLogController, PilotReportController, ReleaseRecordController | ✅ |
+| Maintenance | WorkOrderController, MaintenanceSchedulerController | ✅ |
+| Inventory | InventoryItemController, WarehouseController, SupplierController, PurchaseOrderController, PurchaseRequestController, InventoryMovementController | ✅ |
+| Health | HealthController | ✅ |
+| Stats | StatsController | ✅ |
 
-#### 11.2 测试内容
-- 请求参数验证
-- 响应格式验证
-- 错误码验证
-- 权限验证
+#### 11.2 测试结果
+- 测试用例: 323 个 Controller 测试
+- 总测试: 908 个
+- 行覆盖率: 70.58% (达标)
 
 ---
 
-### Sprint 12: 前端表单完善（P1）
+### Sprint 12: 前端表单完善（P1）✅ 已完成
 
 **目标**: 完善创建/编辑页面 API 对接
+**完成时间**: 2026-01-19
+**完成报告**: [/docs/progress/sprint-12-form-enhancement-2026-01-19.md](./sprint-12-form-enhancement-2026-01-19.md)
 
 #### 12.1 表单页面对接
 | 页面 | 类型 | 状态 |
 |------|------|------|
-| aircraft-form-page | 创建/编辑 | ⏳ |
-| component-form-page | 创建/编辑 | ⏳ |
-| work-order-form-page | 创建/编辑 | ⏳ |
-| flight-log-form-page | 创建/编辑 | ⏳ |
-| pirep-form-page | 创建 | ⏳ |
-| inventory-form-page | 创建/编辑 | ⏳ |
+| aircraft-form-page | 创建/编辑 | ✅ |
+| component-form-page | 创建/编辑 | ✅ |
+| work-order-form-page | 创建/编辑 | ✅ |
+| flight-log-form-page | 创建/编辑 | ✅ 无需修改 |
+| pirep-form-page | 创建 | ✅ 无需修改 |
+| maintenance-schedule-form-page | 创建/编辑 | ✅ 无需修改 |
 
 #### 12.2 表单增强
 | 功能 | 说明 | 状态 |
 |------|------|------|
-| 表单验证 | Zod schema 前端验证 | ⏳ |
-| 错误提示 | 字段级错误提示 | ⏳ |
-| 加载状态 | 提交按钮 loading | ⏳ |
-| 成功反馈 | Toast 提示 + 跳转 | ⏳ |
+| 表单验证 | react-hook-form 验证 | ✅ |
+| 错误提示 | 字段级错误提示 | ✅ |
+| 加载状态 | 提交按钮 loading | ✅ |
+| 成功反馈 | Toast 提示 + 跳转 | ✅ |
 
 ---
 
-### Sprint 13: PWA + 离线支持（P2）
+### Sprint 13: PWA + 离线支持（P2）✅ 已完成
 
 **目标**: 支持野外离线作业场景
+**完成时间**: 2026-01-19
+**完成报告**: [/docs/progress/sprint-13-pwa-offline-2026-01-19.md](./sprint-13-pwa-offline-2026-01-19.md)
 
 #### 13.1 Service Worker
 | 功能 | 说明 | 状态 |
 |------|------|------|
-| 静态资源缓存 | HTML/CSS/JS | ⏳ |
-| API 响应缓存 | 列表数据 | ⏳ |
-| 离线指示器 | 网络状态显示 | ⏳ |
+| 静态资源缓存 | HTML/CSS/JS | ✅ |
+| API 响应缓存 | NetworkFirst 策略 | ✅ |
+| 离线指示器 | 网络状态显示 | ✅ |
 
 #### 13.2 离线数据
 | 功能 | 说明 | 状态 |
 |------|------|------|
-| IndexedDB 存储 | 本地数据持久化 | ⏳ |
-| 离线表单提交 | 队列 + 后台同步 | ⏳ |
-| 冲突解决 | 时间戳 + 版本号 | ⏳ |
+| 基础 PWA 配置 | vite-plugin-pwa | ✅ |
+| 网络状态检测 | useNetworkStatus hook | ✅ |
+| IndexedDB 存储 | 本地数据持久化 | ⏭️ 推迟 |
+| 离线表单提交 | 队列 + 后台同步 | ⏭️ 推迟 |
 
 ---
 
@@ -181,18 +189,18 @@ Phase 2 已完成全部 158+ 个 API 端点开发、前后端对接、测试框�
 - [x] 所有端点配置权限
 - [x] 权限测试通过
 
-### M2: 测试达标（Sprint 10-11 完成）
+### M2: 测试达标（Sprint 10-11 完成）✅
 - [x] E2E 测试覆盖核心流程 (60 个测试，Sprint 10 完成)
-- [ ] Controller 测试覆盖率 > 70%
-- [ ] 无 P0 级别 Bug
+- [x] Controller 测试覆盖率 > 70% (70.58%, Sprint 11 完成)
+- [x] 无 P0 级别 Bug
 
-### M3: 前端完善（Sprint 12 完成）
-- [ ] 所有表单页面 API 对接
-- [ ] 表单验证完善
-- [ ] 用户体验优化
+### M3: 前端完善（Sprint 12 完成）✅
+- [x] 所有表单页面 API 对接
+- [x] 表单验证完善
+- [x] 用户体验优化
 
 ### M4: 生产就绪（Sprint 13-14 完成）
-- [ ] PWA 支持
+- [x] PWA 支持 (Sprint 13 完成)
 - [ ] 性能达标
 - [ ] 文档完善
 

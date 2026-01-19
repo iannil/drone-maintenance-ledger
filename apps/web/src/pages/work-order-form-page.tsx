@@ -50,6 +50,8 @@ import { fullAircraftService, Aircraft } from "../services/fleet.service";
 import { userService, User } from "../services/user.service";
 import { inventoryService, InventoryItem } from "../services/inventory.service";
 import { maintenanceSchedulerService, MaintenanceTrigger } from "../services/maintenance-scheduler.service";
+import { workOrderService, CreateWorkOrderDto, WorkOrderType, WorkOrderPriority } from "../services/work-order.service";
+import { useToast } from "../components/ui/toast";
 
 // Work order types
 const WORK_ORDER_TYPES = [
@@ -115,6 +117,7 @@ export function WorkOrderFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEditing = Boolean(id);
+  const toast = useToast();
 
   // Data from API
   const [aircraftList, setAircraftList] = useState<Aircraft[]>([]);
@@ -149,6 +152,7 @@ export function WorkOrderFormPage() {
   const [filteredParts, setFilteredParts] = useState<InventoryItem[]>([]);
   const [newTask, setNewTask] = useState<Partial<Task>>({ title: "", description: "", isRii: false });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Load initial data from APIs
   useEffect(() => {
@@ -258,11 +262,60 @@ export function WorkOrderFormPage() {
   };
 
   // Handle form submission
-  const handleSubmit = () => {
-    if (validateForm()) {
-      console.log("Submit work order:", formData);
-      // TODO: API call to create/update work order
-      navigate("/work-orders");
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    try {
+      // Map form work order type to API type
+      const typeMap: Record<string, WorkOrderType> = {
+        "SCHEDULED": "SCHEDULED",
+        "UNSCHEDULED": "REPAIR",
+        "MODIFICATION": "MODIFICATION",
+        "INSPECTION": "INSPECTION",
+      };
+
+      // Prepare due date as timestamp
+      const scheduledEnd = formData.dueDate
+        ? new Date(formData.dueDate).getTime()
+        : undefined;
+
+      // Create work order DTO
+      const createDto: CreateWorkOrderDto = {
+        aircraftId: formData.aircraftId,
+        type: typeMap[formData.workOrderType] || "REPAIR",
+        title: formData.title,
+        description: formData.description || undefined,
+        priority: formData.priority as WorkOrderPriority,
+        scheduledEnd,
+        assignedTo: formData.assignedTo || undefined,
+        scheduleId: formData.scheduleId && formData.scheduleId !== "none"
+          ? formData.scheduleId
+          : undefined,
+      };
+
+      // Create the work order
+      const workOrder = await workOrderService.create(createDto);
+
+      // Add tasks to the work order
+      for (let i = 0; i < formData.tasks.length; i++) {
+        const task = formData.tasks[i];
+        await workOrderService.addTask(workOrder.id, {
+          sequence: i + 1,
+          title: task.title,
+          description: task.description || undefined,
+          isRii: task.isRii,
+        });
+      }
+
+      toast.success("工单已创建");
+      navigate(`/work-orders/${workOrder.id}`);
+    } catch (err: any) {
+      console.error("Failed to create work order:", err);
+      const errorMessage = err?.response?.data?.message || err?.message || "创建工单失败，请重试";
+      toast.error("创建失败", errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -404,9 +457,18 @@ export function WorkOrderFormPage() {
           <Button variant="outline" onClick={() => navigate("/work-orders")}>
             取消
           </Button>
-          <Button onClick={handleSubmit}>
-            <Save className="w-4 h-4 mr-2" />
-            {isEditing ? "保存修改" : "创建工单"}
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                提交中...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                {isEditing ? "保存修改" : "创建工单"}
+              </>
+            )}
           </Button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { router } from "./router";
 import { ToastProvider, useToast, setGlobalToast } from "./components/ui/toast";
+import { OfflineIndicator } from "./components/common/offline-indicator";
 import { onApiError } from "./services/api";
 import "./styles/globals.css";
 
@@ -39,7 +40,12 @@ function GlobalErrorHandler({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, [toast]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <OfflineIndicator />
+    </>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

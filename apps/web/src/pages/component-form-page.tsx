@@ -14,8 +14,9 @@ import {
   Loader2,
 } from "lucide-react";
 
-import { componentService, Component } from "../services/component.service";
+import { componentService, Component, CreateComponentDto, UpdateComponentDto, ComponentType } from "../services/component.service";
 import { fullAircraftService, Aircraft } from "../services/fleet.service";
+import { useToast } from "../components/ui/toast";
 
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -134,6 +135,7 @@ export function ComponentFormPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = id !== undefined && id !== "new";
+  const toast = useToast();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -227,16 +229,55 @@ export function ComponentFormPage() {
 
   const onSubmit = async (data: ComponentFormData) => {
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    console.log("Form submitted:", data);
-    setIsSubmitting(false);
+    try {
+      // Map form status to backend status
+      const backendStatus = mapFormStatusToBackendStatus(data.status);
 
-    // Navigate back to list or detail page
-    if (isEditing) {
-      navigate(`/components/${id}`);
-    } else {
-      navigate("/components");
+      // Parse dates to timestamps
+      const parseDate = (dateStr: string): number | undefined => {
+        if (!dateStr) return undefined;
+        return new Date(dateStr).getTime();
+      };
+
+      if (isEditing && id) {
+        // Update existing component
+        const updateDto: UpdateComponentDto = {
+          partNumber: data.name,
+          type: data.type as ComponentType,
+          manufacturer: data.manufacturer,
+          model: data.model || undefined,
+          description: data.name,
+          status: backendStatus as any,
+          maxFlightHours: data.flightHoursLimit || undefined,
+          maxCycles: data.cycleLimit || undefined,
+        };
+        await componentService.update(id, updateDto);
+        toast.success("零部件信息已更新");
+        navigate(`/components/${id}`);
+      } else {
+        // Create new component
+        const createDto: CreateComponentDto = {
+          serialNumber: data.serialNumber,
+          partNumber: data.name,
+          type: data.type as ComponentType,
+          manufacturer: data.manufacturer,
+          model: data.model || undefined,
+          description: data.name,
+          maxFlightHours: data.flightHoursLimit || undefined,
+          maxCycles: data.cycleLimit || undefined,
+          manufacturedAt: parseDate(data.productionDate),
+          purchasedAt: parseDate(data.purchaseDate),
+        };
+        const newComponent = await componentService.create(createDto);
+        toast.success("零部件已创建");
+        navigate(`/components/${newComponent.id}`);
+      }
+    } catch (err: any) {
+      console.error("Failed to save component:", err);
+      const errorMessage = err?.response?.data?.message || err?.message || "保存失败，请重试";
+      toast.error(isEditing ? "更新失败" : "创建失败", errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
