@@ -673,3 +673,19 @@ export class StatsService {
     };
   }
 }
+
+/**
+ * Get work order status text (exported for testing)
+ */
+export function getWorkOrderStatusText(status: string): string {
+  const statusMap: Record<string, string> = {
+    OPEN: "已创建",
+    IN_PROGRESS: "执行中",
+    PENDING_PARTS: "待零件",
+    PENDING_INSPECTION: "待检验",
+    COMPLETED: "已完成",
+    RELEASED: "已放行",
+    CANCELLED: "已取消",
+  };
+  return statusMap[status] || status;
+}
