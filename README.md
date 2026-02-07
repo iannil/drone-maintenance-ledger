@@ -190,7 +190,7 @@ DroneMaintenance-Ledger 提供完整的航空器全生命周期管理：
 - **Monorepo 架构**：Turborepo 统一管理多包
 - **RESTful API**：158+ 端点，Swagger 文档完备
 - **响应式 UI**：shadcn/ui 组件，支持暗色模式
-- **测试覆盖**：155 个单元测试，91% 平均覆盖率
+- **测试覆盖**：908 个单元测试，91% 平均覆盖率
 - **Docker 支持**：一键容器化部署
 
 ---

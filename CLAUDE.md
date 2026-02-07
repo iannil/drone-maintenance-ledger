@@ -6,7 +6,7 @@
 
 DroneMaintenance-Ledger 是一个面向无人机和 eVTOL 飞行器的开源 MRO（维护、维修和运行）系统。它充当低空飞行器的"电子病历"系统，追踪零部件全生命周期、维保计划和适航合规状态。
 
-当前状态： 预实施规划阶段。项目目前仅有文档，尚未编写任何代码。
+当前状态： Phase 2 已完成，准备进入 Phase 3。项目已实现 158+ API 端点、51 个前端页面、21 个数据库表，908 个单元测试全部通过。
 
 ## 项目指南
 
@@ -61,15 +61,20 @@ DroneMaintenance-Ledger 是一个面向无人机和 eVTOL 飞行器的开源 MRO
 - 电池循环 - 例如：每 300 次充放电循环
 - 寿命件 (LLP) - 绝对寿命上限（例如：桨叶 500 小时强制报废）
 
-## 建议的技术栈
+## 技术栈
 
-README 中建议以下技术栈（尚未实施）：
-
-- 后端： Go (Golang) 或 Python (FastAPI/Django)
-- 前端： React 或 Vue 3 + Ant Design/Element Plus
-- 数据库： PostgreSQL（配合 PostGIS 支持地理空间功能）
-- 移动端： Flutter 或 uni-app
-- 可选： 区块链集成用于可验证记录（Hyperledger Fabric 或以太坊 Layer 2）
+| 层级 | 技术 | 版本 |
+|------|------|------|
+| Monorepo | Turborepo + pnpm | ^2.7 / ^9.15 |
+| 后端 | NestJS | ^10.x |
+| 前端 | React + MobX | ^19.x |
+| UI 组件 | shadcn/ui + Tailwind CSS | ^3.x |
+| ORM | Drizzle ORM | ^0.38.x |
+| 数据库 | SQLite (开发) / PostgreSQL (生产) | - |
+| 认证 | JWT + bcrypt | - |
+| 校验 | Zod | ^3.x |
+| 日志 | Winston | ^3.x |
+| 安全 | Helmet + @nestjs/throttler | ^8.x / ^6.x |
 
 ## 关键设计考量
 
@@ -87,8 +92,42 @@ README 中建议以下技术栈（尚未实施）：
 
 ## 开发命令
 
-暂无。 项目处于规划阶段，尚未设置构建系统、包管理器或依赖项。
+```bash
+# 安装依赖
+pnpm install
+
+# 初始化数据库
+pnpm db:push
+pnpm --filter @repo/db db:seed
+
+# 启动开发服务器
+pnpm dev
+
+# 运行测试
+pnpm test
+
+# 构建
+pnpm build
+```
+
+### 服务地址
+
+- Web 前端: http://localhost:3000
+- API 服务: http://localhost:3001
+- API 文档: http://localhost:3001/api/docs
+
+### 测试账号
+
+| 用户名 | 密码 | 角色 |
+|--------|------|------|
+| admin | password123 | 管理员 |
+| pilot | password123 | 飞手 |
+| mechanic | password123 | 维修工 |
+| inspector | password123 | 检验员 |
 
 ## 文档
 
-主要文档位于 `README.md`（中文）。包含详细的产品需求、技术架构方案、商业模式分析以及按模块划分的功能拆解。
+- 项目进展: `docs/PROJECT_STATUS.md`
+- 部署指南: `docs/deployment.md`
+- 开发规范: `docs/standards/`
+- 完成报告: `docs/reports/completed/`
